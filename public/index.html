@@ -54,29 +54,7 @@
       <div class="login-panel">
         <div class="login-copy">
           <h2>进入学习平台</h2>
-          <p>请输入你的编号和姓名。</p>
-        </div>
-
-        <div class="field" id="classField">
-          <label for="className">班级</label>
-          <div class="input-wrap">
-            <span class="input-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 8.2v5.2c0 1.8 2.2 3.3 5 3.3s5-1.5 5-3.3V8.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M20 7v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-            </span>
-            <select id="className" class="input select-input">
-              <option value="">正在读取班级…</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="studentId">学生编号</label>
-          <div class="input-wrap">
-            <span class="input-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M5 6.8A2.8 2.8 0 0 1 7.8 4h8.4A2.8 2.8 0 0 1 19 6.8v10.4a2.8 2.8 0 0 1-2.8 2.8H7.8A2.8 2.8 0 0 1 5 17.2V6.8Z" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 9h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-            </span>
-            <input id="studentId" class="input" maxlength="30" placeholder="请输入编号" autocomplete="off" />
-          </div>
+          <p>请输入你的姓名。</p>
         </div>
 
         <div class="field">
@@ -92,7 +70,7 @@
         <button id="enterBtn" class="primary full enter-button">进入学习平台 <span aria-hidden="true">→</span></button>
         <div id="loginError" class="error hidden"></div>
 
-        <p class="login-hint">进入后先上传作品图片，AI 会根据图片开始与你对话。</p>
+        <p class="login-hint">进入后将自动进入老师当前指定的任务。</p>
         <button id="adminEntryBtn" class="admin-entry-link" type="button">管理员进入</button>
       </div>
     </section>
@@ -102,8 +80,9 @@
         <div class="chat-head-main">
           <span class="chat-avatar" aria-hidden="true">学</span>
           <div>
-            <h2>学习支持平台</h2>
+            <div class="chat-title-row"><h2>学习支持平台</h2><span id="currentTaskBadge" class="task-badge"></span></div>
             <div id="studentMeta" class="student-meta"></div>
+            <div id="taskNotice" class="task-notice hidden"></div>
           </div>
         </div>
         <button id="switchBtn" class="secondary">更换学生</button>
@@ -130,7 +109,7 @@
         </div>
         <div class="composer-footer">
           <span id="sendStatus" class="status"></span>
-          <span class="enter-tip">可多次上传图片 · Enter 发送 · Shift + Enter 换行</span>
+          <span class="enter-tip">新任务先发作品图 · 后续可继续发图或文字</span>
         </div>
       </div>
     </section>

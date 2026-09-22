@@ -22,9 +22,18 @@
     </section>
 
     <section id="dashboard" class="hidden">
+      <section class="card task-control-card">
+        <div class="task-control-copy">
+          <div class="panel-kicker">当前课堂任务</div>
+          <strong id="activeTaskTitle">正在读取…</strong>
+          <span>学生每次进入都会自动进入这里选中的任务；同一任务会继续上次对话。</span>
+        </div>
+        <div id="taskControlButtons" class="task-control-buttons"></div>
+      </section>
+
       <div class="card dashboard-toolbar">
         <div>
-          <div class="toolbar-title">班级与学生数据</div>
+          <div class="toolbar-title">学生数据</div>
           <div id="rosterSummary" class="toolbar-sub">正在读取名单…</div>
         </div>
         <div class="toolbar">
@@ -40,21 +49,23 @@
       <div class="admin-layout">
         <section class="card panel">
           <div class="panel-head roster-head">
-            <div><strong>学生名单</strong><div class="panel-sub">名单中的学生都会显示，包括尚未进入平台的学生。</div></div>
+            <div><strong>学生名单</strong><div class="panel-sub">点击学生即可查看任务1、任务2、任务3的独立对话。</div></div>
             <span id="studentCount" class="count-pill"></span>
-          </div>
-          <div class="class-filter-wrap">
-            <label for="classFilter">班级</label>
-            <select id="classFilter" class="input compact-select"><option value="">全部班级</option></select>
           </div>
           <div id="studentList" class="student-list"></div>
         </section>
 
         <section class="card panel">
-          <div class="panel-head">
-            <div><div class="panel-kicker">对话记录</div><strong id="detailTitle">请选择一名学生</strong><div id="detailSub" class="panel-sub">点击左侧学生后，可直接查看其与 AI 的完整对话。</div></div><span id="messageCountPill" class="count-pill hidden"></span>
+          <div class="panel-head conversation-head">
+            <div>
+              <div class="panel-kicker">学生对话</div>
+              <strong id="detailTitle">请选择一名学生</strong>
+              <div id="detailSub" class="panel-sub">学生一旦提交，刷新后即可在这里看到。</div>
+            </div>
+            <span id="messageCountPill" class="count-pill hidden"></span>
           </div>
-          <div id="adminMessages" class="admin-messages"><div class="empty empty-chat"><strong>尚未选择学生</strong><span>点击左侧任意学生，即可在这里查看学生与 AI 的完整多轮对话和上传图片。</span></div></div>
+          <div id="studentTaskTabs" class="student-task-tabs hidden"></div>
+          <div id="adminMessages" class="admin-messages"><div class="empty empty-chat"><strong>尚未选择学生</strong><span>点击左侧学生后，可以分别查看三个任务中的完整对话和上传图片。</span></div></div>
         </section>
       </div>
     </section>
@@ -66,14 +77,14 @@
       <button id="rosterModalClose" class="modal-close" type="button" aria-label="关闭">×</button>
       <div class="modal-icon">表</div>
       <h2 id="rosterModalTitle">上传学生名单</h2>
-      <p class="muted">支持 Excel（.xlsx/.xls）和 CSV。第一行需要包含：<strong>班级、学生编号、姓名</strong>。</p>
+      <p class="muted">支持 Excel（.xlsx/.xls）和 CSV。第一行只需要一列：<strong>姓名</strong>。</p>
       <label class="roster-drop" for="rosterFile">
         <span class="roster-drop-title">选择名单文件</span>
         <span id="rosterFileName" class="roster-drop-sub">点击选择 Excel 或 CSV</span>
         <input id="rosterFile" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
       </label>
       <div id="rosterPreview" class="roster-preview hidden"></div>
-      <div class="roster-note">重新上传会替换“当前可登录名单”，但不会删除已经产生的聊天和图片记录。</div>
+      <div class="roster-note">重新上传会替换当前可登录名单，但不会删除学生已经产生的三个任务对话。名单如有重名，需要先给重名学生添加可识别标记。</div>
       <button id="confirmRosterBtn" class="primary full enter-button" type="button" disabled>确认上传并替换名单</button>
       <div id="rosterError" class="error hidden"></div>
     </section>
