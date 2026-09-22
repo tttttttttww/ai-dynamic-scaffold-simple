@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 学习助手</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">AI 学习助手</div>
+  </header>
+
+  <main class="page">
+    <section id="loginView" class="card login-card">
+      <h1>进入学习平台</h1>
+      <p class="muted">请输入自己的编号和姓名。正式学生使用 S01–S30。</p>
+      <div class="field">
+        <label for="studentId">学生编号</label>
+        <input id="studentId" class="input" maxlength="3" placeholder="例如 S01" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="studentName">姓名</label>
+        <input id="studentName" class="input" maxlength="20" placeholder="请输入姓名" autocomplete="off" />
+      </div>
+      <button id="enterBtn" class="primary full">进入学习平台</button>
+      <div id="loginError" class="error hidden"></div>
+
+      <div class="entry-divider"><span>管理员入口</span></div>
+      <button id="adminEntryBtn" class="admin-entry full" type="button">管理员进入</button>
+    </section>
+
+    <section id="chatView" class="card chat-shell hidden">
+      <div class="chat-head">
+        <div>
+          <h2>与 AI 助手对话</h2>
+          <div id="studentMeta" class="student-meta"></div>
+        </div>
+        <button id="switchBtn" class="secondary">更换学生</button>
+      </div>
+      <div id="messages" class="messages"></div>
+      <div class="composer">
+        <div id="previewRow" class="preview-row hidden">
+          <img id="previewImage" alt="待上传图片预览" />
+          <div>
+            <div id="previewName" style="font-size:14px;font-weight:600"></div>
+            <button id="removeImageBtn" class="secondary" style="margin-top:7px;padding:6px 9px;font-size:12px">移除图片</button>
+          </div>
+        </div>
+        <textarea id="messageInput" placeholder="输入你想问 AI 的内容……"></textarea>
+        <div class="composer-actions">
+          <label class="file-label">＋ 上传图片<input id="imageInput" type="file" accept="image/*" /></label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="sendStatus" class="status"></span>
+            <button id="sendBtn" class="primary">发送</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
+    <div class="modal-backdrop" data-close-admin-modal></div>
+    <section class="modal-card">
+      <button id="adminModalClose" class="modal-close" type="button" aria-label="关闭">×</button>
+      <h2 id="adminModalTitle">管理员进入</h2>
+      <p class="muted">请输入管理员密码，验证成功后直接进入后台。</p>
+      <div class="field">
+        <label for="coverAdminPassword">管理员密码</label>
+        <input id="coverAdminPassword" class="input" type="password" autocomplete="current-password" placeholder="请输入密码" />
+      </div>
+      <button id="coverAdminLoginBtn" class="primary full" type="button">进入后台</button>
+      <div id="coverAdminError" class="error hidden"></div>
+    </section>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

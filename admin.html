@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>教师后台</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">教师后台</div>
+    <a class="link-btn" href="/">返回学生端</a>
+  </header>
+
+  <main class="page">
+    <section id="adminLogin" class="card login-card">
+      <h1>教师后台</h1>
+      <p class="muted">请输入后台密码。</p>
+      <div class="field">
+        <label for="adminPassword">密码</label>
+        <input id="adminPassword" class="input" type="password" autocomplete="current-password" />
+      </div>
+      <button id="adminLoginBtn" class="primary full">登录</button>
+      <div id="adminError" class="error hidden"></div>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="toolbar" style="margin-bottom:14px">
+        <button id="refreshBtn" class="secondary">刷新数据</button>
+        <button id="exportJsonBtn" class="secondary">导出正式 JSON</button>
+        <button id="exportCsvBtn" class="secondary">导出正式 CSV</button>
+        <button id="exportAllBtn" class="secondary">导出全部 JSON（含 S00）</button>
+        <button id="logoutBtn" class="secondary">退出</button>
+      </div>
+      <div class="admin-layout">
+        <section class="card panel">
+          <div class="panel-head">
+            <strong>学生列表</strong>
+            <span id="studentCount" class="muted" style="font-size:13px"></span>
+          </div>
+          <div id="studentList" class="student-list"></div>
+        </section>
+        <section class="card panel">
+          <div class="panel-head">
+            <div>
+              <strong id="detailTitle">选择一名学生</strong>
+              <div id="detailSub" class="muted" style="font-size:12px;margin-top:3px"></div>
+            </div>
+          </div>
+          <div id="adminMessages" class="admin-messages">
+            <div class="empty">从左侧选择学生后查看完整记录。</div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/admin.js"></script>
+</body>
+</html>
