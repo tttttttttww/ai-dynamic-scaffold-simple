@@ -3,71 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI 学习支持平台</title>
+  <title>AI 学习助手</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-  <div class="bg-grid"></div>
+  <div class="page-bg" aria-hidden="true">
+    <span class="bg-dot dot-a"></span>
+    <span class="bg-dot dot-b"></span>
+    <span class="bg-dot dot-c"></span>
+  </div>
 
-  <header class="topbar">
-    <div class="brand-wrap">
-      <div class="brand-mark">AI</div>
-      <div>
-        <div class="brand">AI 学习支持平台</div>
-        <div class="brand-sub">图片上传 · 智能对话 · 教师可追踪</div>
-      </div>
-    </div>
+  <header class="topbar student-topbar">
+    <a class="brand-wrap" href="/" aria-label="AI 学习助手首页">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M7.4 7.2h9.2a3.4 3.4 0 0 1 3.4 3.4v3.8a3.4 3.4 0 0 1-3.4 3.4h-4.4l-3.3 2.1.8-2.1H7.4A3.4 3.4 0 0 1 4 14.4v-3.8a3.4 3.4 0 0 1 3.4-3.4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M9 12h.01M12 12h.01M15 12h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M12 3.2v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-text">AI 学习助手</span>
+    </a>
   </header>
 
-  <main class="page">
-    <section id="loginView" class="card login-card enhanced-cover">
-      <div class="cover-hero">
-        <div class="hero-badge">课堂研究平台</div>
-        <h1>进入学习平台</h1>
-        <p class="muted cover-desc">学生可上传图片并向 AI 提问；教师可在后台查看过程数据与图片记录。</p>
-        <div class="hero-points">
-          <span>编号登录</span>
-          <span>支持图片</span>
-          <span>多轮对话</span>
-          <span>自动留痕</span>
+  <main class="landing-wrap">
+    <section id="loginView" class="login-stage">
+      <div class="welcome-panel">
+        <div class="visual-scene" aria-hidden="true">
+          <div class="visual-halo"></div>
+          <div class="visual-card visual-image-card">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="3.5" y="4" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/>
+              <circle cx="9" cy="9.5" r="1.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="m5.8 17 4.2-4.1 2.6 2.4 2.2-2 3.4 3.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="visual-card visual-chat-card">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="visual-spark spark-one">✦</div>
+          <div class="visual-spark spark-two">✦</div>
+        </div>
+        <div class="welcome-copy">
+          <span class="eyebrow">AI LEARNING</span>
+          <h1>和 AI 一起探索</h1>
+          <p>上传图片，提出问题，开始你的学习。</p>
         </div>
       </div>
 
-      <div class="field-group">
+      <div class="login-panel">
+        <div class="login-copy">
+          <h2>进入学习平台</h2>
+          <p>请输入你的编号和姓名。</p>
+        </div>
+
+        <div class="field" id="classField">
+          <label for="className">班级</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 8.2v5.2c0 1.8 2.2 3.3 5 3.3s5-1.5 5-3.3V8.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M20 7v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </span>
+            <select id="className" class="input select-input">
+              <option value="">正在读取班级…</option>
+            </select>
+          </div>
+        </div>
+
         <div class="field">
           <label for="studentId">学生编号</label>
-          <input id="studentId" class="input" maxlength="3" placeholder="例如 S01" autocomplete="off" />
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M5 6.8A2.8 2.8 0 0 1 7.8 4h8.4A2.8 2.8 0 0 1 19 6.8v10.4a2.8 2.8 0 0 1-2.8 2.8H7.8A2.8 2.8 0 0 1 5 17.2V6.8Z" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 9h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </span>
+            <input id="studentId" class="input" maxlength="30" placeholder="请输入编号" autocomplete="off" />
+          </div>
         </div>
+
         <div class="field">
           <label for="studentName">姓名</label>
-          <input id="studentName" class="input" maxlength="20" placeholder="请输入姓名" autocomplete="off" />
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.7"/><path d="M5.7 19.2c.6-3.1 3-5 6.3-5s5.7 1.9 6.3 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </span>
+            <input id="studentName" class="input" maxlength="20" placeholder="请输入姓名" autocomplete="off" />
+          </div>
         </div>
+
+        <button id="enterBtn" class="primary full enter-button">进入学习平台 <span aria-hidden="true">→</span></button>
+        <div id="loginError" class="error hidden"></div>
+
+        <p class="login-hint">进入后可直接输入问题，或上传图片与 AI 对话。</p>
+        <button id="adminEntryBtn" class="admin-entry-link" type="button">管理员进入</button>
       </div>
-
-      <div class="tips-box">
-        <div class="tips-title">使用说明</div>
-        <ul>
-          <li>正式学生使用 <strong>S01–S30</strong>；<strong>S00</strong> 为教师测试号。</li>
-          <li>进入后可以直接输入问题，也可以先上传一张图片再提问。</li>
-          <li>你的对话与上传图片会保存，便于教师后续查看学习过程。</li>
-        </ul>
-      </div>
-
-      <button id="enterBtn" class="primary full large-btn">进入学习平台</button>
-      <div id="loginError" class="error hidden"></div>
-
-      <div class="entry-divider"><span>教师入口</span></div>
-      <button id="adminEntryBtn" class="admin-entry full" type="button">管理员进入</button>
     </section>
 
     <section id="chatView" class="card chat-shell hidden">
       <div class="chat-head">
-        <div>
-          <div class="mini-chip">学习对话区</div>
-          <h2>与 AI 助手对话</h2>
-          <div id="studentMeta" class="student-meta"></div>
+        <div class="chat-head-main">
+          <span class="chat-avatar" aria-hidden="true">AI</span>
+          <div>
+            <h2>AI 学习助手</h2>
+            <div id="studentMeta" class="student-meta"></div>
+          </div>
         </div>
         <button id="switchBtn" class="secondary">更换学生</button>
       </div>
@@ -82,10 +119,13 @@
         </div>
         <textarea id="messageInput" placeholder="输入你想问 AI 的内容……"></textarea>
         <div class="composer-actions">
-          <label class="file-label">＋ 上传图片<input id="imageInput" type="file" accept="image/*" /></label>
+          <label class="file-label">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 15.5 8.3 11l3.2 3.2 2.2-2.2 6.3 6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="8.5" r="1.4" stroke="currentColor" stroke-width="1.5"/></svg>
+            上传图片<input id="imageInput" type="file" accept="image/*" />
+          </label>
           <div class="action-group">
             <span id="sendStatus" class="status"></span>
-            <button id="sendBtn" class="primary">发送</button>
+            <button id="sendBtn" class="primary send-button">发送</button>
           </div>
         </div>
       </div>
@@ -96,13 +136,14 @@
     <div class="modal-backdrop" data-close-admin-modal></div>
     <section class="modal-card">
       <button id="adminModalClose" class="modal-close" type="button" aria-label="关闭">×</button>
+      <div class="modal-icon">管</div>
       <h2 id="adminModalTitle">管理员进入</h2>
-      <p class="muted">请输入管理员密码，验证成功后直接进入后台。</p>
+      <p class="muted">请输入管理员密码。</p>
       <div class="field">
         <label for="coverAdminPassword">管理员密码</label>
-        <input id="coverAdminPassword" class="input" type="password" autocomplete="current-password" placeholder="请输入密码" />
+        <input id="coverAdminPassword" class="input plain-input" type="password" autocomplete="current-password" placeholder="请输入密码" />
       </div>
-      <button id="coverAdminLoginBtn" class="primary full large-btn" type="button">进入后台</button>
+      <button id="coverAdminLoginBtn" class="primary full enter-button" type="button">进入后台</button>
       <div id="coverAdminError" class="error hidden"></div>
     </section>
   </div>

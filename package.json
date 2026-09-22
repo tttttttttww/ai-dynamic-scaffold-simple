@@ -1,11 +1,12 @@
 {
   "name": "ai-dynamic-scaffold-simple",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Minimal student image + Coze chat + teacher data dashboard for EdgeOne Makers",
+  "description": "Student image + Coze chat + multi-class roster + teacher dashboard for EdgeOne Makers",
   "dependencies": {
-    "@edgeone/pages-blob": "latest"
+    "@edgeone/pages-blob": "latest",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "build": "node build.mjs"

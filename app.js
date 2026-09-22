@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const state = {
+  className: localStorage.getItem('ads_class_name') || '',
+  studentKey: localStorage.getItem('ads_student_key') || '',
   studentId: localStorage.getItem('ads_student_id') || '',
   studentName: localStorage.getItem('ads_student_name') || '',
   conversationId: localStorage.getItem('ads_conversation_id') || '',
@@ -7,9 +9,6 @@ const state = {
   sending: false,
 };
 
-function escapeHtml(s='') {
-  return s.replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-}
 function fmtTime(iso) {
   try { return new Date(iso).toLocaleString('zh-CN', {hour12:false}); } catch { return ''; }
 }
@@ -17,7 +16,6 @@ function showError(text) {
   $('loginError').textContent = text;
   $('loginError').classList.toggle('hidden', !text);
 }
-
 function showAdminError(text='') {
   $('coverAdminError').textContent = text;
   $('coverAdminError').classList.toggle('hidden', !text);
@@ -46,58 +44,65 @@ async function coverAdminLogin() {
   $('coverAdminLoginBtn').textContent = '正在验证…';
   try {
     const res = await fetch('/api/admin/login', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({password})
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password})
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '登录失败');
     sessionStorage.setItem('ads_admin_token', data.token);
     window.location.href = '/admin.html';
-  } catch (e) {
-    showAdminError(e.message);
-  } finally {
+  } catch (e) { showAdminError(e.message); }
+  finally {
     $('coverAdminLoginBtn').disabled = false;
     $('coverAdminLoginBtn').textContent = '进入后台';
   }
 }
 
-function scrollBottom() {
-  const el = $('messages');
-  el.scrollTop = el.scrollHeight;
+async function loadClasses() {
+  const select = $('className');
+  try {
+    const res = await fetch('/api/roster/classes', {cache:'no-store'});
+    const data = await res.json().catch(() => ({}));
+    const classes = Array.isArray(data.classes) ? data.classes : [];
+    select.innerHTML = '';
+    if (!classes.length) {
+      const opt=document.createElement('option');
+      opt.value=''; opt.textContent='请等待老师导入学生名单';
+      select.appendChild(opt);
+      $('enterBtn').disabled = true;
+      return [];
+    }
+    const first=document.createElement('option'); first.value=''; first.textContent='请选择班级';
+    select.appendChild(first);
+    classes.forEach(c => {
+      const opt=document.createElement('option'); opt.value=c; opt.textContent=c; select.appendChild(opt);
+    });
+    if (state.className && classes.includes(state.className)) select.value=state.className;
+    else if (classes.length === 1) select.value=classes[0];
+    $('enterBtn').disabled = false;
+    return classes;
+  } catch {
+    select.innerHTML='<option value="">班级读取失败，请刷新页面</option>';
+    $('enterBtn').disabled = true;
+    return [];
+  }
 }
+
+function scrollBottom() { const el = $('messages'); el.scrollTop = el.scrollHeight; }
 function renderMessage(msg) {
   const wrap = document.createElement('div');
   wrap.className = `msg ${msg.role === 'user' ? 'user' : 'assistant'}`;
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-
+  const bubble = document.createElement('div'); bubble.className = 'bubble';
   if (msg.localImageUrl) {
-    const img = document.createElement('img');
-    img.className = 'msg-image';
-    img.src = msg.localImageUrl;
-    img.alt = '上传图片';
-    bubble.appendChild(img);
+    const img = document.createElement('img'); img.className='msg-image'; img.src=msg.localImageUrl; img.alt='上传图片'; bubble.appendChild(img);
   }
-  if (msg.text) {
-    const text = document.createElement('div');
-    text.textContent = msg.text;
-    bubble.appendChild(text);
-  }
-  const t = document.createElement('span');
-  t.className = 'msg-time';
-  t.textContent = fmtTime(msg.createdAt || new Date().toISOString());
-  bubble.appendChild(t);
-  wrap.appendChild(bubble);
-  $('messages').appendChild(wrap);
-  scrollBottom();
+  if (msg.text) { const text=document.createElement('div'); text.textContent=msg.text; bubble.appendChild(text); }
+  const t=document.createElement('span'); t.className='msg-time'; t.textContent=fmtTime(msg.createdAt || new Date().toISOString()); bubble.appendChild(t);
+  wrap.appendChild(bubble); $('messages').appendChild(wrap); scrollBottom();
 }
 
-async function startStudent(studentId, studentName) {
+async function startStudent(className, studentId, studentName) {
   const res = await fetch('/api/student/start', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({studentId, studentName})
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({className, studentId, studentName})
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || '进入失败');
@@ -106,146 +111,92 @@ async function startStudent(studentId, studentName) {
 
 async function enter() {
   showError('');
-  const studentId = $('studentId').value.trim().toUpperCase();
+  const className = $('className').value.trim();
+  const studentId = $('studentId').value.trim();
   const studentName = $('studentName').value.trim();
-  $('enterBtn').disabled = true;
-  $('enterBtn').textContent = '正在进入…';
+  if (!className) return showError('请选择班级。');
+  $('enterBtn').disabled = true; $('enterBtn').innerHTML = '正在进入…';
   try {
-    const data = await startStudent(studentId, studentName);
-    state.studentId = data.studentId;
-    state.studentName = data.studentName;
-    state.conversationId = data.conversationId || '';
+    const data = await startStudent(className, studentId, studentName);
+    state.className=data.className; state.studentKey=data.studentKey; state.studentId=data.studentId; state.studentName=data.studentName; state.conversationId=data.conversationId || '';
+    localStorage.setItem('ads_class_name', state.className);
+    localStorage.setItem('ads_student_key', state.studentKey);
     localStorage.setItem('ads_student_id', state.studentId);
     localStorage.setItem('ads_student_name', state.studentName);
-    if (state.conversationId) localStorage.setItem('ads_conversation_id', state.conversationId);
-    else localStorage.removeItem('ads_conversation_id');
+    if (state.conversationId) localStorage.setItem('ads_conversation_id', state.conversationId); else localStorage.removeItem('ads_conversation_id');
     showChat(data.messages || []);
-  } catch (e) {
-    showError(e.message);
-  } finally {
-    $('enterBtn').disabled = false;
-    $('enterBtn').textContent = '进入学习平台';
-  }
+  } catch (e) { showError(e.message); }
+  finally { $('enterBtn').disabled = false; $('enterBtn').innerHTML = '进入学习平台 <span aria-hidden="true">→</span>'; }
 }
 
 function showChat(history=[]) {
-  $('loginView').classList.add('hidden');
-  $('chatView').classList.remove('hidden');
-  $('studentMeta').textContent = `${state.studentId} · ${state.studentName}${state.studentId === 'S00' ? '（教师测试）' : ''}`;
-  $('messages').innerHTML = '';
-  if (!history.length) {
-    renderMessage({role:'assistant', text:'你好！你可以直接提问，也可以上传一张图片后让我一起看。', createdAt:new Date().toISOString()});
-  } else {
-    history.forEach(m => renderMessage({role:m.role, text:m.text, createdAt:m.createdAt}));
-  }
+  $('loginView').classList.add('hidden'); $('chatView').classList.remove('hidden');
+  $('studentMeta').textContent = `${state.className} · ${state.studentId} · ${state.studentName}`;
+  $('messages').innerHTML='';
+  if (!history.length) renderMessage({role:'assistant', text:'你好！你可以直接提问，也可以上传一张图片后让我一起看。', createdAt:new Date().toISOString()});
+  else history.forEach(m => renderMessage({role:m.role, text:m.text, createdAt:m.createdAt}));
 }
-
 function clearImage() {
-  state.selectedFile = null;
-  $('imageInput').value = '';
-  $('previewRow').classList.add('hidden');
-  $('previewImage').src = '';
+  state.selectedFile=null; $('imageInput').value=''; $('previewRow').classList.add('hidden'); $('previewImage').src='';
 }
-
 async function sendMessage() {
   if (state.sending) return;
-  const text = $('messageInput').value.trim();
-  const file = state.selectedFile;
+  const text=$('messageInput').value.trim(); const file=state.selectedFile;
   if (!text && !file) return;
-  if (file && file.size > 10 * 1024 * 1024) {
-    alert('图片请控制在 10 MB 以内。');
-    return;
-  }
-
-  state.sending = true;
-  $('sendBtn').disabled = true;
-  $('imageInput').disabled = true;
-  $('sendStatus').textContent = 'AI 正在回复…';
-
-  const localImageUrl = file ? URL.createObjectURL(file) : null;
-  renderMessage({role:'user', text: text || '（上传了一张图片）', localImageUrl, createdAt:new Date().toISOString()});
-  $('messageInput').value = '';
-  clearImage();
-
-  const form = new FormData();
-  form.append('studentId', state.studentId);
-  form.append('studentName', state.studentName);
-  form.append('message', text);
+  if (file && file.size > 10*1024*1024) { alert('图片请控制在 10 MB 以内。'); return; }
+  state.sending=true; $('sendBtn').disabled=true; $('imageInput').disabled=true; $('sendStatus').textContent='AI 正在回复…';
+  const localImageUrl=file ? URL.createObjectURL(file) : null;
+  renderMessage({role:'user', text:text || '（上传了一张图片）', localImageUrl, createdAt:new Date().toISOString()});
+  $('messageInput').value=''; clearImage();
+  const form=new FormData();
+  form.append('studentKey', state.studentKey); form.append('className', state.className); form.append('studentId', state.studentId); form.append('studentName', state.studentName); form.append('message', text);
   if (state.conversationId) form.append('conversationId', state.conversationId);
   if (file) form.append('image', file, file.name);
-
   try {
-    const res = await fetch('/api/chat', {method:'POST', body:form});
-    const data = await res.json().catch(() => ({}));
+    const res=await fetch('/api/chat',{method:'POST',body:form}); const data=await res.json().catch(()=>({}));
     if (!res.ok) throw new Error(data.error || '发送失败');
-    if (data.conversationId) {
-      state.conversationId = data.conversationId;
-      localStorage.setItem('ads_conversation_id', data.conversationId);
-    }
+    if (data.conversationId) { state.conversationId=data.conversationId; localStorage.setItem('ads_conversation_id',data.conversationId); }
     renderMessage({role:'assistant', text:data.answer || 'AI 没有返回文字回复。', createdAt:data.createdAt});
-  } catch (e) {
-    renderMessage({role:'assistant', text:`本次请求失败：${e.message}`, createdAt:new Date().toISOString()});
-  } finally {
-    state.sending = false;
-    $('sendBtn').disabled = false;
-    $('imageInput').disabled = false;
-    $('sendStatus').textContent = '';
-  }
+  } catch(e) { renderMessage({role:'assistant', text:`本次请求失败：${e.message}`, createdAt:new Date().toISOString()}); }
+  finally { state.sending=false; $('sendBtn').disabled=false; $('imageInput').disabled=false; $('sendStatus').textContent=''; }
 }
 
 $('adminEntryBtn').addEventListener('click', openAdminModal);
 $('adminModalClose').addEventListener('click', closeAdminModal);
 document.querySelector('[data-close-admin-modal]').addEventListener('click', closeAdminModal);
 $('coverAdminLoginBtn').addEventListener('click', coverAdminLogin);
-$('coverAdminPassword').addEventListener('keydown', e => {
-  if (e.key === 'Enter') coverAdminLogin();
-  if (e.key === 'Escape') closeAdminModal();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('adminModal').classList.contains('hidden')) closeAdminModal();
-});
-
+$('coverAdminPassword').addEventListener('keydown', e => { if(e.key==='Enter') coverAdminLogin(); if(e.key==='Escape') closeAdminModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape' && !$('adminModal').classList.contains('hidden')) closeAdminModal(); });
 $('enterBtn').addEventListener('click', enter);
-$('studentName').addEventListener('keydown', e => { if (e.key === 'Enter') enter(); });
-$('studentId').addEventListener('keydown', e => { if (e.key === 'Enter') enter(); });
+$('studentName').addEventListener('keydown', e => { if(e.key==='Enter') enter(); });
+$('studentId').addEventListener('keydown', e => { if(e.key==='Enter') enter(); });
 $('sendBtn').addEventListener('click', sendMessage);
-$('messageInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
+$('messageInput').addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
 $('imageInput').addEventListener('change', () => {
-  const file = $('imageInput').files?.[0];
-  if (!file) return clearImage();
-  if (!file.type.startsWith('image/')) { alert('请选择图片文件。'); return clearImage(); }
-  state.selectedFile = file;
-  $('previewImage').src = URL.createObjectURL(file);
-  $('previewName').textContent = file.name;
-  $('previewRow').classList.remove('hidden');
+  const file=$('imageInput').files?.[0]; if(!file) return clearImage();
+  if(!file.type.startsWith('image/')) { alert('请选择图片文件。'); return clearImage(); }
+  state.selectedFile=file; $('previewImage').src=URL.createObjectURL(file); $('previewName').textContent=file.name; $('previewRow').classList.remove('hidden');
 });
 $('removeImageBtn').addEventListener('click', clearImage);
-$('switchBtn').addEventListener('click', () => {
-  localStorage.removeItem('ads_student_id');
-  localStorage.removeItem('ads_student_name');
-  localStorage.removeItem('ads_conversation_id');
-  state.studentId = state.studentName = state.conversationId = '';
-  $('chatView').classList.add('hidden');
-  $('loginView').classList.remove('hidden');
-  $('studentId').value = '';
-  $('studentName').value = '';
+$('switchBtn').addEventListener('click', async () => {
+  ['ads_class_name','ads_student_key','ads_student_id','ads_student_name','ads_conversation_id'].forEach(k=>localStorage.removeItem(k));
+  state.className=state.studentKey=state.studentId=state.studentName=state.conversationId='';
+  $('chatView').classList.add('hidden'); $('loginView').classList.remove('hidden'); $('studentId').value=''; $('studentName').value='';
+  await loadClasses();
 });
 
-(async function boot() {
-  if (state.studentId && state.studentName) {
-    $('studentId').value = state.studentId;
-    $('studentName').value = state.studentName;
+(async function boot(){
+  await loadClasses();
+  if (state.className && state.studentId && state.studentName) {
+    $('className').value=state.className; $('studentId').value=state.studentId; $('studentName').value=state.studentName;
     try {
-      const data = await startStudent(state.studentId, state.studentName);
-      state.conversationId = data.conversationId || state.conversationId;
-      if (state.conversationId) localStorage.setItem('ads_conversation_id', state.conversationId);
+      const data=await startStudent(state.className,state.studentId,state.studentName);
+      state.studentKey=data.studentKey; state.conversationId=data.conversationId || state.conversationId;
+      localStorage.setItem('ads_student_key',state.studentKey);
+      if(state.conversationId) localStorage.setItem('ads_conversation_id',state.conversationId);
       showChat(data.messages || []);
     } catch {
-      localStorage.removeItem('ads_student_id');
-      localStorage.removeItem('ads_student_name');
-      localStorage.removeItem('ads_conversation_id');
+      ['ads_class_name','ads_student_key','ads_student_id','ads_student_name','ads_conversation_id'].forEach(k=>localStorage.removeItem(k));
     }
   }
 })();
