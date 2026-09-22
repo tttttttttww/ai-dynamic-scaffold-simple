@@ -89,6 +89,8 @@ async function loadClasses() {
 
 function scrollBottom() { const el = $('messages'); el.scrollTop = el.scrollHeight; }
 function renderMessage(msg) {
+  const empty=$('chatEmpty');
+  if(empty) empty.remove();
   const wrap = document.createElement('div');
   wrap.className = `msg ${msg.role === 'user' ? 'user' : 'assistant'}`;
   const bubble = document.createElement('div'); bubble.className = 'bubble';
@@ -133,18 +135,28 @@ function showChat(history=[]) {
   $('loginView').classList.add('hidden'); $('chatView').classList.remove('hidden');
   $('studentMeta').textContent = `${state.className} · ${state.studentId} · ${state.studentName}`;
   $('messages').innerHTML='';
-  if (!history.length) renderMessage({role:'assistant', text:'你好！你可以直接提问，也可以上传一张图片后让我一起看。', createdAt:new Date().toISOString()});
-  else history.forEach(m => renderMessage({role:m.role, text:m.text, createdAt:m.createdAt}));
+  if (!history.length) {
+    const empty=document.createElement('div');
+    empty.id='chatEmpty';
+    empty.className='chat-empty';
+    empty.innerHTML='<div class="chat-empty-icon">▧</div><strong>先上传你的作品图片</strong><span>选择图片后点击“发送给 AI”，AI 会根据图片开始和你对话。</span>';
+    $('messages').appendChild(empty);
+  } else history.forEach(m => renderMessage({role:m.role, text:m.text, createdAt:m.createdAt}));
 }
 function clearImage() {
-  state.selectedFile=null; $('imageInput').value=''; $('previewRow').classList.add('hidden'); $('previewImage').src='';
+  state.selectedFile=null;
+  $('imageInput').value='';
+  $('previewRow').classList.add('hidden');
+  $('previewImage').src='';
+  $('sendBtn').textContent='发送给 AI';
+  $('sendBtn').classList.remove('image-ready');
 }
 async function sendMessage() {
   if (state.sending) return;
   const text=$('messageInput').value.trim(); const file=state.selectedFile;
   if (!text && !file) return;
   if (file && file.size > 10*1024*1024) { alert('图片请控制在 10 MB 以内。'); return; }
-  state.sending=true; $('sendBtn').disabled=true; $('imageInput').disabled=true; $('sendStatus').textContent='AI 正在回复…';
+  state.sending=true; $('sendBtn').disabled=true; $('imageInput').disabled=true; $('sendStatus').textContent=file ? '图片已发送，AI 正在查看…' : 'AI 正在回复…'; $('sendBtn').textContent='发送中…';
   const localImageUrl=file ? URL.createObjectURL(file) : null;
   renderMessage({role:'user', text:text || '（上传了一张图片）', localImageUrl, createdAt:new Date().toISOString()});
   $('messageInput').value=''; clearImage();
@@ -158,7 +170,7 @@ async function sendMessage() {
     if (data.conversationId) { state.conversationId=data.conversationId; localStorage.setItem('ads_conversation_id',data.conversationId); }
     renderMessage({role:'assistant', text:data.answer || 'AI 没有返回文字回复。', createdAt:data.createdAt});
   } catch(e) { renderMessage({role:'assistant', text:`本次请求失败：${e.message}`, createdAt:new Date().toISOString()}); }
-  finally { state.sending=false; $('sendBtn').disabled=false; $('imageInput').disabled=false; $('sendStatus').textContent=''; }
+  finally { state.sending=false; $('sendBtn').disabled=false; $('imageInput').disabled=false; $('sendStatus').textContent=''; $('sendBtn').textContent=state.selectedFile?'发送给 AI': '发送'; }
 }
 
 $('adminEntryBtn').addEventListener('click', openAdminModal);
@@ -175,7 +187,12 @@ $('messageInput').addEventListener('keydown', e => { if(e.key==='Enter' && !e.sh
 $('imageInput').addEventListener('change', () => {
   const file=$('imageInput').files?.[0]; if(!file) return clearImage();
   if(!file.type.startsWith('image/')) { alert('请选择图片文件。'); return clearImage(); }
-  state.selectedFile=file; $('previewImage').src=URL.createObjectURL(file); $('previewName').textContent=file.name; $('previewRow').classList.remove('hidden');
+  state.selectedFile=file;
+  $('previewImage').src=URL.createObjectURL(file);
+  $('previewName').textContent=file.name;
+  $('previewRow').classList.remove('hidden');
+  $('sendBtn').textContent='发送给 AI';
+  $('sendBtn').classList.add('image-ready');
 });
 $('removeImageBtn').addEventListener('click', clearImage);
 $('switchBtn').addEventListener('click', async () => {

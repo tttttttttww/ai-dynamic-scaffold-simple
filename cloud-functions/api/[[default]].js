@@ -147,7 +147,12 @@ async function uploadToCoze(token,image,filename){
 }
 async function startCozeChat({token,botId,userId,message,fileId,conversationId,meta}){
   let content=message, contentType='text';
-  if(fileId){ const text=message||'请根据这张图片继续帮助我。'; content=JSON.stringify([{type:'image',file_id:fileId},{type:'text',text}]); contentType='object_string'; }
+  if(fileId){
+    const parts=[{type:'image',file_id:fileId}];
+    if(message) parts.push({type:'text',text:message});
+    content=JSON.stringify(parts);
+    contentType='object_string';
+  }
   const payload={bot_id:botId,user_id:userId,stream:false,auto_save_history:true,additional_messages:[{role:'user',type:'question',content,content_type:contentType}],meta_data:meta};
   const suffix=conversationId?`?conversation_id=${encodeURIComponent(conversationId)}`:'';
   const res=await fetch(`https://api.coze.cn/v3/chat${suffix}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
