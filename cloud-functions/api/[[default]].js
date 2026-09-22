@@ -19,6 +19,25 @@ function safeId(v=''){ return String(v).replace(/[^A-Za-z0-9_-]/g,''); }
 function studentKeyOfName(name){ return createHash('sha256').update(`name\0${normalizeName(name)}`).digest('hex').slice(0,24); }
 function isTestName(v){ const n=normalizeName(v).toUpperCase(); return n==='测试' || n==='S00'; }
 function testAccount(){ return {...TEST_ACCOUNT,studentKey:studentKeyOfName(TEST_ACCOUNT.studentName)}; }
+function isTestProfile(p){
+  if(!p) return false;
+  return !!p.isTest || isTestName(p.studentName||'') || String(p.testCode||'').toUpperCase()==='S00' || String(p.studentId||'').toUpperCase()==='S00';
+}
+function mergeTaskStatsFromProfiles(profiles=[]){
+  const out=emptyTaskStats();
+  for(const p of profiles){
+    const stats=normalizeProfileTaskStats(p);
+    for(const t of TASKS){
+      const cur=out[t.id], src=stats[t.id]||{};
+      cur.messageCount=Number(cur.messageCount||0)+Number(src.messageCount||0);
+      if(src.updatedAt && (!cur.updatedAt || String(src.updatedAt)>String(cur.updatedAt))) {
+        cur.updatedAt=src.updatedAt;
+        if(src.conversationId) cur.conversationId=src.conversationId;
+      } else if(!cur.conversationId && src.conversationId) cur.conversationId=src.conversationId;
+    }
+  }
+  return out;
+}
 function taskById(id){ return TASKS.find(t=>t.id===id) || null; }
 function taskBase(context,studentKey,taskId){ return `${basePrefix(context)}/students/${studentKey}/tasks/${taskId}`; }
 function rosterKey(context){ return `${basePrefix(context)}/roster.json`; }
@@ -271,9 +290,30 @@ async function combinedStudents(store,context){
     const p=pmap.get(r.studentKey); pmap.delete(r.studentKey);
     return {...r,isTest:false,createdAt:p?.createdAt||null,updatedAt:p?.updatedAt||null,taskStats:normalizeProfileTaskStats(p),hasEntered:!!p,inRoster:true};
   });
-  const test=testAccount(), tp=pmap.get(test.studentKey); if(tp) pmap.delete(test.studentKey);
-  rows.unshift({...test,createdAt:tp?.createdAt||null,updatedAt:tp?.updatedAt||null,taskStats:normalizeProfileTaskStats(tp),hasEntered:!!tp,inRoster:false});
-  for(const p of pmap.values()) rows.push({...p,studentName:p.studentName||'历史数据',taskStats:normalizeProfileTaskStats(p),hasEntered:true,inRoster:false,isTest:!!p.isTest});
+
+  // All historical variants of the teacher test account are one logical S00 account.
+  const test=testAccount();
+  const testProfiles=[];
+  for(const [key,p] of [...pmap.entries()]){
+    if(key===test.studentKey || isTestProfile(p)){
+      testProfiles.push(p);
+      pmap.delete(key);
+    }
+  }
+  const aliasStudentKeys=[...new Set([test.studentKey,...testProfiles.map(p=>p.studentKey).filter(Boolean)])];
+  const createdTimes=testProfiles.map(p=>p.createdAt).filter(Boolean).sort();
+  const updatedTimes=testProfiles.map(p=>p.updatedAt).filter(Boolean).sort();
+  rows.unshift({
+    ...test,
+    createdAt:createdTimes[0]||null,
+    updatedAt:updatedTimes.at(-1)||null,
+    taskStats:mergeTaskStatsFromProfiles(testProfiles),
+    hasEntered:testProfiles.length>0,
+    inRoster:false,
+    aliasStudentKeys
+  });
+
+  for(const p of pmap.values()) rows.push({...p,studentName:p.studentName||'历史数据',taskStats:normalizeProfileTaskStats(p),hasEntered:true,inRoster:false,isTest:false});
   rows.sort((a,b)=>{ if(!!a.isTest!==!!b.isTest) return a.isTest?-1:1; return String(a.studentName).localeCompare(String(b.studentName),'zh-CN'); });
   return {rows,roster};
 }
@@ -295,11 +335,17 @@ async function adminStudent(context){
   if(!studentKey) return json({error:'学生参数无效。'},400);
   const {rows}=await combinedStudents(auth.store,context), row=rows.find(s=>s.studentKey===studentKey); if(!row) return json({error:'没有该学生。'},404);
   const taskState=await getTaskState(auth.store,context), selectedTask=taskById(requestedTask)||taskState.activeTask;
-  const messages=(await listMessages(auth.store,context,studentKey,selectedTask.id)).filter(m=>m.role!=='system_error');
+  const sourceKeys=row.isTest ? (Array.isArray(row.aliasStudentKeys)&&row.aliasStudentKeys.length?row.aliasStudentKeys:[studentKey]) : [studentKey];
+  const messages=[];
+  for(const sourceStudentKey of sourceKeys){
+    const part=(await listMessages(auth.store,context,sourceStudentKey,selectedTask.id)).filter(m=>m.role!=='system_error');
+    for(const m of part) messages.push({...m,sourceStudentKey});
+  }
+  messages.sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||String(a.messageId).localeCompare(String(b.messageId)));
   const taskSummaries=[];
   for(const t of TASKS){
-    const session=await getSession(auth.store,context,studentKey,t.id);
-    taskSummaries.push({id:t.id,label:t.label,messageCount:Number(session?.messageCount||row.taskStats?.[t.id]?.messageCount||0),updatedAt:session?.updatedAt||row.taskStats?.[t.id]?.updatedAt||null,conversationId:session?.conversationId||row.taskStats?.[t.id]?.conversationId||'',hasStarted:!!session||Number(row.taskStats?.[t.id]?.messageCount||0)>0});
+    const st=row.taskStats?.[t.id]||{};
+    taskSummaries.push({id:t.id,label:t.label,messageCount:Number(st.messageCount||0),updatedAt:st.updatedAt||null,conversationId:st.conversationId||'',hasStarted:Number(st.messageCount||0)>0});
   }
   return json({profile:row,selectedTask,activeTask:taskState.activeTask,tasks:taskSummaries,messages});
 }
