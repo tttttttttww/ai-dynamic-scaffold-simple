@@ -31,15 +31,24 @@
         <div id="taskControlButtons" class="task-control-buttons"></div>
       </section>
 
-      <div class="card dashboard-toolbar">
+      <div class="card dashboard-toolbar live-toolbar">
         <div>
-          <div class="toolbar-title">学生数据</div>
-          <div id="studentSummary" class="toolbar-sub">学生输入姓名进入后会自动出现在这里。</div>
+          <div class="toolbar-title-row">
+            <div class="toolbar-title">课堂实时监看</div>
+            <span class="live-badge"><i></i> 自动刷新</span>
+          </div>
+          <div id="studentSummary" class="toolbar-sub">学生一提交，后台会自动更新。</div>
+        </div>
+        <div class="live-summary">
+          <div class="live-metric"><span>已进入</span><strong id="enteredMetric">0</strong></div>
+          <div class="live-metric processing"><span>AI处理中</span><strong id="processingMetric">0</strong></div>
+          <div class="live-metric failed"><span>异常</span><strong id="failedMetric">0</strong></div>
+          <div class="last-sync">最近更新 <span id="lastSyncTime">—</span></div>
         </div>
         <div class="toolbar">
-          <button id="refreshBtn" class="secondary compact-btn">刷新</button>
-          <button id="exportCsvBtn" class="secondary compact-btn">导出正式 CSV</button>
-          <button id="exportJsonBtn" class="secondary compact-btn">导出正式 JSON</button>
+          <button id="refreshBtn" class="secondary compact-btn">立即刷新</button>
+          <button id="exportCsvBtn" class="secondary compact-btn">导出 CSV</button>
+          <button id="exportJsonBtn" class="secondary compact-btn">导出 JSON</button>
           <button id="logoutBtn" class="secondary compact-btn">退出</button>
         </div>
       </div>
@@ -60,7 +69,10 @@
               <strong id="detailTitle">请选择一名学生</strong>
               <div id="detailSub" class="panel-sub">学生一旦提交，刷新后即可在这里看到。</div>
             </div>
-            <span id="messageCountPill" class="count-pill hidden"></span>
+            <div class="detail-status-group">
+              <span id="taskStatusPill" class="status-pill hidden"></span>
+              <span id="messageCountPill" class="count-pill hidden"></span>
+            </div>
           </div>
           <div id="studentTaskTabs" class="student-task-tabs hidden"></div>
           <div id="adminMessages" class="admin-messages"><div class="empty empty-chat"><strong>尚未选择学生</strong><span>点击左侧学生后，可以分别查看三个任务中的完整对话和上传图片。</span></div></div>

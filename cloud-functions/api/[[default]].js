@@ -25,6 +25,7 @@ function isTestProfile(p){
 }
 function mergeTaskStatsFromProfiles(profiles=[]){
   const out=emptyTaskStats();
+  const runtimeFields=['status','pendingChatId','lastUserAt','lastAssistantAt','responseSeconds','lastError','chatStartedAt'];
   for(const p of profiles){
     const stats=normalizeProfileTaskStats(p);
     for(const t of TASKS){
@@ -33,8 +34,13 @@ function mergeTaskStatsFromProfiles(profiles=[]){
       if(src.updatedAt && (!cur.updatedAt || String(src.updatedAt)>String(cur.updatedAt))) {
         cur.updatedAt=src.updatedAt;
         if(src.conversationId) cur.conversationId=src.conversationId;
+        for(const f of runtimeFields) if(src[f]!==undefined) cur[f]=src[f];
       } else if(!cur.conversationId && src.conversationId) cur.conversationId=src.conversationId;
     }
+  }
+  for(const t of TASKS){
+    const x=out[t.id];
+    if(!x.status || x.status==='not_started') x.status=Number(x.messageCount||0)>0?'ready':'not_started';
   }
   return out;
 }
@@ -116,7 +122,7 @@ async function saveMessage(store,context,studentKey,taskId,message){
   const ts=Date.now();
   await putJson(store,`${taskBase(context,studentKey,taskId)}/messages/${String(ts).padStart(13,'0')}-${message.messageId}.json`,message);
 }
-function emptyTaskStats(){ return Object.fromEntries(TASKS.map(t=>[t.id,{messageCount:0,updatedAt:null,conversationId:''}])); }
+function emptyTaskStats(){ return Object.fromEntries(TASKS.map(t=>[t.id,{messageCount:0,updatedAt:null,conversationId:'',status:'not_started',pendingChatId:'',lastUserAt:null,lastAssistantAt:null,responseSeconds:null,lastError:'',chatStartedAt:null}])); }
 function normalizeProfileTaskStats(profile){
   const stats=emptyTaskStats();
   for(const t of TASKS){ if(profile?.taskStats?.[t.id]) stats[t.id]={...stats[t.id],...profile.taskStats[t.id]}; }
@@ -157,7 +163,16 @@ async function uploadToCoze(token,image,filename){
 }
 async function startCozeChat({token,botId,userId,message,fileId,conversationId,meta}){
   let content=message, contentType='text';
-  if(fileId){ const parts=[{type:'image',file_id:fileId}]; if(message) parts.push({type:'text',text:message}); content=JSON.stringify(parts); contentType='object_string'; }
+  if(fileId){
+    // Coze image turns are more stable when the current user turn also carries text context.
+    // If the student only uploaded an image, add a neutral internal sentence that does not
+    // instruct the bot how to scaffold or answer. This sentence is NOT stored/displayed as
+    // the student's visible message in our platform.
+    const turnText=message||'这是我本轮提交的作品图片。';
+    const parts=[{type:'text',text:turnText},{type:'image',file_id:fileId}];
+    content=JSON.stringify(parts);
+    contentType='object_string';
+  }
   const payload={bot_id:botId,user_id:userId,stream:false,auto_save_history:true,additional_messages:[{role:'user',type:'question',content,content_type:contentType}],meta_data:meta};
   const suffix=conversationId?`?conversation_id=${encodeURIComponent(conversationId)}`:'';
   const res=await fetch(`https://api.coze.cn/v3/chat${suffix}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -184,12 +199,13 @@ async function getCozeAnswer(token,conversationId,chatId){
   return parts.join('\n').trim();
 }
 
-async function updateActivity(store,context,entry,taskId,conversationId,at,delta=1){
+async function updateActivity(store,context,entry,taskId,conversationId,at,delta=1,runtime={}){
   const profile=await ensureProfile(store,context,entry), stats=normalizeProfileTaskStats(profile);
-  stats[taskId]={...stats[taskId],messageCount:Number(stats[taskId]?.messageCount||0)+delta,updatedAt:at,conversationId:conversationId||stats[taskId]?.conversationId||''};
+  stats[taskId]={...stats[taskId],...runtime,messageCount:Number(stats[taskId]?.messageCount||0)+delta,updatedAt:at,conversationId:conversationId||stats[taskId]?.conversationId||''};
   profile.taskStats=stats; profile.updatedAt=at; await saveProfile(store,context,profile);
   let session=await getSession(store,context,entry.studentKey,taskId) || {studentKey:entry.studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,createdAt:at,messageCount:0,conversationId:''};
   session.studentName=entry.studentName; session.updatedAt=at; session.messageCount=Number(session.messageCount||0)+delta; if(conversationId) session.conversationId=conversationId;
+  Object.assign(session,runtime);
   await saveSession(store,context,entry.studentKey,taskId,session);
 }
 
@@ -222,11 +238,13 @@ async function chat(context){
     const createdAt=new Date().toISOString(), conversationId=requestedConversationId||session.conversationId||'';
     const chatStart=await startCozeChat({token,botId,userId:`u_${studentKey}_${taskId}`,message,fileId:cozeFileId,conversationId,meta:{student_key:studentKey,student_name:entry.studentName,task_id:taskId,task_label:current.activeTask.label}});
     await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:current.activeTask.label,role:'user',text:message||'（上传了一张图片）',imageId:imageId||null,createdAt,conversationId:chatStart.conversationId,chatId:chatStart.chatId});
-    await updateActivity(store,context,entry,taskId,chatStart.conversationId,createdAt,1);
+    await updateActivity(store,context,entry,taskId,chatStart.conversationId,createdAt,1,{status:'processing',pendingChatId:chatStart.chatId,lastUserAt:createdAt,chatStartedAt:createdAt,lastError:''});
     return json({status:'pending',taskId,taskLabel:current.activeTask.label,conversationId:chatStart.conversationId,chatId:chatStart.chatId,createdAt});
   }catch(e){
-    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:String(e?.message||e),imageId:imageId||null,createdAt:new Date().toISOString(),conversationId:requestedConversationId||session.conversationId||'',chatId:''}).catch(()=>{});
-    return json({error:String(e?.message||'AI 请求失败')},502);
+    const failedAt=new Date().toISOString(), errorText=String(e?.message||e);
+    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:errorText,imageId:imageId||null,createdAt:failedAt,conversationId:requestedConversationId||session.conversationId||'',chatId:''}).catch(()=>{});
+    await updateActivity(store,context,entry,taskId,requestedConversationId||session.conversationId||'',failedAt,0,{status:'failed',pendingChatId:'',lastError:errorText}).catch(()=>{});
+    return json({error:errorText},502);
   }
 }
 
@@ -240,14 +258,18 @@ async function chatStatus(context){
   try{
     const status=await getCozeStatus(token,conversationId,chatId); if(status!=='completed') return json({status});
     const messages=await listMessages(store,context,studentKey,taskId), existing=messages.find(m=>m.role==='assistant'&&String(m.chatId||'')===chatId);
-    if(existing) return json({status:'completed',answer:existing.text,taskId,conversationId,chatId,createdAt:existing.createdAt});
+    if(existing){ await updateActivity(store,context,entry,taskId,conversationId,existing.createdAt,0,{status:'ready',pendingChatId:'',lastAssistantAt:existing.createdAt,responseSeconds:existing.responseSeconds??null,lastError:''}); return json({status:'completed',answer:existing.text,taskId,conversationId,chatId,createdAt:existing.createdAt,responseSeconds:existing.responseSeconds??null}); }
     const answer=await getCozeAnswer(token,conversationId,chatId), answerAt=new Date().toISOString(), task=taskById(taskId);
-    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:task.label,role:'assistant',text:answer,imageId:null,createdAt:answerAt,conversationId,chatId});
-    await updateActivity(store,context,entry,taskId,conversationId,answerAt,1);
-    return json({status:'completed',answer,taskId,conversationId,chatId,createdAt:answerAt});
+    const userMessage=messages.filter(m=>m.role==='user'&&String(m.chatId||'')===chatId).at(-1);
+    const responseSeconds=userMessage?.createdAt?Math.max(0,Math.round((Date.parse(answerAt)-Date.parse(userMessage.createdAt))/100)/10):null;
+    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:task.label,role:'assistant',text:answer,imageId:null,createdAt:answerAt,conversationId,chatId,responseSeconds});
+    await updateActivity(store,context,entry,taskId,conversationId,answerAt,1,{status:'ready',pendingChatId:'',lastAssistantAt:answerAt,responseSeconds,lastError:''});
+    return json({status:'completed',answer,taskId,conversationId,chatId,createdAt:answerAt,responseSeconds});
   }catch(e){
-    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:String(e?.message||e),imageId:null,createdAt:new Date().toISOString(),conversationId,chatId}).catch(()=>{});
-    return json({status:'failed',error:String(e?.message||'AI 请求失败')},502);
+    const failedAt=new Date().toISOString(), errorText=String(e?.message||e);
+    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:errorText,imageId:null,createdAt:failedAt,conversationId,chatId}).catch(()=>{});
+    await updateActivity(store,context,entry,taskId,conversationId,failedAt,0,{status:'failed',pendingChatId:'',lastError:errorText}).catch(()=>{});
+    return json({status:'failed',error:errorText},502);
   }
 }
 
@@ -340,14 +362,15 @@ async function adminStudent(context){
   const sourceKeys=Array.isArray(row.aliasStudentKeys)&&row.aliasStudentKeys.length?row.aliasStudentKeys:[studentKey];
   const messages=[];
   for(const sourceStudentKey of sourceKeys){
-    const part=(await listMessages(auth.store,context,sourceStudentKey,selectedTask.id)).filter(m=>m.role!=='system_error');
+    const part=await listMessages(auth.store,context,sourceStudentKey,selectedTask.id);
     for(const m of part) messages.push({...m,sourceStudentKey});
   }
   messages.sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||String(a.messageId).localeCompare(String(b.messageId)));
   const taskSummaries=[];
   for(const t of TASKS){
     const st=row.taskStats?.[t.id]||{};
-    taskSummaries.push({id:t.id,label:t.label,messageCount:Number(st.messageCount||0),updatedAt:st.updatedAt||null,conversationId:st.conversationId||'',hasStarted:Number(st.messageCount||0)>0});
+    const status=st.status||(Number(st.messageCount||0)>0?'ready':'not_started');
+    taskSummaries.push({id:t.id,label:t.label,messageCount:Number(st.messageCount||0),updatedAt:st.updatedAt||null,conversationId:st.conversationId||'',hasStarted:Number(st.messageCount||0)>0,status,pendingChatId:st.pendingChatId||'',lastUserAt:st.lastUserAt||null,lastAssistantAt:st.lastAssistantAt||null,responseSeconds:st.responseSeconds??null,lastError:st.lastError||''});
   }
   return json({profile:row,selectedTask,activeTask:taskState.activeTask,tasks:taskSummaries,messages});
 }
