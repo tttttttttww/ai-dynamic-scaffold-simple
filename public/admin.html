@@ -34,11 +34,9 @@
       <div class="card dashboard-toolbar">
         <div>
           <div class="toolbar-title">学生数据</div>
-          <div id="rosterSummary" class="toolbar-sub">正在读取名单…</div>
+          <div id="studentSummary" class="toolbar-sub">学生输入姓名进入后会自动出现在这里。</div>
         </div>
         <div class="toolbar">
-          <button id="uploadRosterBtn" class="primary compact-btn">上传学生名单</button>
-          <button id="downloadTemplateBtn" class="secondary compact-btn">下载名单模板</button>
           <button id="refreshBtn" class="secondary compact-btn">刷新</button>
           <button id="exportCsvBtn" class="secondary compact-btn">导出正式 CSV</button>
           <button id="exportJsonBtn" class="secondary compact-btn">导出正式 JSON</button>
@@ -49,7 +47,7 @@
       <div class="admin-layout">
         <section class="card panel">
           <div class="panel-head roster-head">
-            <div><strong>学生名单</strong><div class="panel-sub">点击学生即可查看任务1、任务2、任务3的独立对话。</div></div>
+            <div><strong>学生</strong><div class="panel-sub">学生首次输入姓名进入后会自动记录；点击即可查看三个任务的独立对话。</div></div>
             <span id="studentCount" class="count-pill"></span>
           </div>
           <div id="studentList" class="student-list"></div>
@@ -71,26 +69,6 @@
     </section>
   </main>
 
-  <div id="rosterModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="rosterModalTitle">
-    <div class="modal-backdrop" data-close-roster-modal></div>
-    <section class="modal-card roster-modal-card">
-      <button id="rosterModalClose" class="modal-close" type="button" aria-label="关闭">×</button>
-      <div class="modal-icon">表</div>
-      <h2 id="rosterModalTitle">上传学生名单</h2>
-      <p class="muted">支持 Excel（.xlsx/.xls）和 CSV。第一行只需要一列：<strong>姓名</strong>。</p>
-      <label class="roster-drop" for="rosterFile">
-        <span class="roster-drop-title">选择名单文件</span>
-        <span id="rosterFileName" class="roster-drop-sub">点击选择 Excel 或 CSV</span>
-        <input id="rosterFile" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-      </label>
-      <div id="rosterPreview" class="roster-preview hidden"></div>
-      <div class="roster-note">重新上传会替换当前可登录名单，但不会删除学生已经产生的三个任务对话。名单如有重名，需要先给重名学生添加可识别标记。</div>
-      <button id="confirmRosterBtn" class="primary full enter-button" type="button" disabled>确认上传并替换名单</button>
-      <div id="rosterError" class="error hidden"></div>
-    </section>
-  </div>
-
-  <script src="/vendor/xlsx.full.min.js"></script>
   <script type="module" src="/admin.js"></script>
 </body>
 </html>

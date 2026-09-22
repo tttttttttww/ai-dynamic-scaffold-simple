@@ -93,13 +93,12 @@ function normalizeRosterRows(rows=[]){
   return out;
 }
 async function findStudent(store,context,{studentKey='',studentName=''}){
-  if(isTestName(studentName) || studentKey===testAccount().studentKey) return testAccount();
-  const roster=await getRoster(store,context);
-  let entry=studentKey ? roster.students.find(s=>s.studentKey===studentKey) : null;
-  if(!entry && studentName){ const n=normalizeName(studentName); entry=roster.students.find(s=>s.studentName===n); }
-  if(!entry) return null;
-  if(studentName && entry.studentName!==normalizeName(studentName)) return null;
-  return entry;
+  const name=normalizeName(studentName);
+  if(isTestName(name) || studentKey===testAccount().studentKey) return testAccount();
+  if(!name) return null;
+  const canonicalKey=studentKeyOfName(name);
+  if(studentKey && studentKey!==canonicalKey) return null;
+  return {studentKey:canonicalKey,studentName:name,isTest:false,testCode:''};
 }
 
 async function getProfile(store,context,studentKey){ return await getJson(store,profileKey(context,studentKey)); }
@@ -138,14 +137,9 @@ async function ensureTaskSession(store,context,entry,task){
 async function startStudent(context){
   const store=storeOf(context), body=await context.request.json().catch(()=>({})), studentName=normalizeName(body.studentName);
   if(!studentName) return json({error:'请输入姓名。'},400);
-  let entry;
-  if(isTestName(studentName)) entry=testAccount();
-  else {
-    const roster=await getRoster(store,context);
-    if(!roster.students.length) return json({error:'老师尚未上传学生名单，请联系老师。'},503);
-    entry=roster.students.find(s=>s.studentName===studentName);
-    if(!entry) return json({error:'名单中没有找到这个姓名，请检查后重新输入。'},403);
-  }
+  const entry=isTestName(studentName)
+    ? testAccount()
+    : {studentKey:studentKeyOfName(studentName),studentName,isTest:false,testCode:''};
   const taskState=await getTaskState(store,context), task=taskState.activeTask;
   const profile=await ensureProfile(store,context,entry), session=await ensureTaskSession(store,context,entry,task);
   const messages=(await listMessages(store,context,entry.studentKey,task.id)).filter(m=>m.role==='user'||m.role==='assistant');
@@ -206,7 +200,7 @@ async function chat(context){
   const studentKey=safeId(form.get('studentKey')||''), studentName=normalizeName(form.get('studentName')), taskId=safeId(form.get('taskId')||'');
   const message=String(form.get('message')||'').trim().slice(0,8000), requestedConversationId=String(form.get('conversationId')||'').trim(), image=form.get('image');
   if(!studentKey||!studentName||!taskById(taskId)) return json({error:'学生或任务信息无效，请重新进入。'},400);
-  const entry=await findStudent(store,context,{studentKey,studentName}); if(!entry||entry.studentKey!==studentKey) return json({error:'当前学生不在名单中，请重新进入。'},403);
+  const entry=await findStudent(store,context,{studentKey,studentName}); if(!entry||entry.studentKey!==studentKey) return json({error:'学生身份无效，请重新进入。'},403);
   const current=await getTaskState(store,context);
   if(current.activeTaskId!==taskId) return json({error:`老师已切换到${current.activeTask.label}，页面即将更新。`,activeTask:current.activeTask},409);
   const session=await ensureTaskSession(store,context,entry,current.activeTask);
@@ -285,42 +279,50 @@ async function listProfiles(store,context){
   return profiles;
 }
 async function combinedStudents(store,context){
-  const roster=await getRoster(store,context), profiles=await listProfiles(store,context), pmap=new Map(profiles.map(p=>[p.studentKey,p]));
-  const rows=roster.students.map(r=>{
-    const p=pmap.get(r.studentKey); pmap.delete(r.studentKey);
-    return {...r,isTest:false,createdAt:p?.createdAt||null,updatedAt:p?.updatedAt||null,taskStats:normalizeProfileTaskStats(p),hasEntered:!!p,inRoster:true};
-  });
-
-  // All historical variants of the teacher test account are one logical S00 account.
-  const test=testAccount();
-  const testProfiles=[];
-  for(const [key,p] of [...pmap.entries()]){
-    if(key===test.studentKey || isTestProfile(p)){
-      testProfiles.push(p);
-      pmap.delete(key);
-    }
+  const profiles=await listProfiles(store,context), rows=[];
+  const groups=new Map(), testProfiles=[];
+  for(const p of profiles){
+    if(isTestProfile(p)){ testProfiles.push(p); continue; }
+    const name=normalizeName(p.studentName||'历史数据');
+    if(!groups.has(name)) groups.set(name,[]);
+    groups.get(name).push(p);
   }
-  const aliasStudentKeys=[...new Set([test.studentKey,...testProfiles.map(p=>p.studentKey).filter(Boolean)])];
-  const createdTimes=testProfiles.map(p=>p.createdAt).filter(Boolean).sort();
-  const updatedTimes=testProfiles.map(p=>p.updatedAt).filter(Boolean).sort();
-  rows.unshift({
+
+  const test=testAccount();
+  const testCreated=testProfiles.map(p=>p.createdAt).filter(Boolean).sort();
+  const testUpdated=testProfiles.map(p=>p.updatedAt).filter(Boolean).sort();
+  rows.push({
     ...test,
-    createdAt:createdTimes[0]||null,
-    updatedAt:updatedTimes.at(-1)||null,
+    createdAt:testCreated[0]||null,
+    updatedAt:testUpdated.at(-1)||null,
     taskStats:mergeTaskStatsFromProfiles(testProfiles),
     hasEntered:testProfiles.length>0,
-    inRoster:false,
-    aliasStudentKeys
+    aliasStudentKeys:[...new Set([test.studentKey,...testProfiles.map(p=>p.studentKey).filter(Boolean)])]
   });
 
-  for(const p of pmap.values()) rows.push({...p,studentName:p.studentName||'历史数据',taskStats:normalizeProfileTaskStats(p),hasEntered:true,inRoster:false,isTest:false});
+  for(const [studentName,group] of groups.entries()){
+    const canonicalKey=studentKeyOfName(studentName);
+    const created=group.map(p=>p.createdAt).filter(Boolean).sort();
+    const updated=group.map(p=>p.updatedAt).filter(Boolean).sort();
+    rows.push({
+      studentKey:canonicalKey,
+      studentName,
+      isTest:false,
+      testCode:'',
+      createdAt:created[0]||null,
+      updatedAt:updated.at(-1)||null,
+      taskStats:mergeTaskStatsFromProfiles(group),
+      hasEntered:true,
+      aliasStudentKeys:[...new Set([canonicalKey,...group.map(p=>p.studentKey).filter(Boolean)])]
+    });
+  }
   rows.sort((a,b)=>{ if(!!a.isTest!==!!b.isTest) return a.isTest?-1:1; return String(a.studentName).localeCompare(String(b.studentName),'zh-CN'); });
-  return {rows,roster};
+  return {rows};
 }
 async function adminStudents(context){
   const auth=await authAdmin(context); if(!auth) return json({error:'未登录。'},401);
-  const {rows,roster}=await combinedStudents(auth.store,context), taskState=await getTaskState(auth.store,context);
-  return json({students:rows,rosterCount:roster.students.length,enteredCount:rows.filter(s=>!s.isTest&&s.inRoster&&s.hasEntered).length,rosterUpdatedAt:roster.updatedAt,...taskState});
+  const {rows}=await combinedStudents(auth.store,context), taskState=await getTaskState(auth.store,context);
+  return json({students:rows,studentCount:rows.filter(s=>!s.isTest).length,enteredCount:rows.filter(s=>!s.isTest&&s.hasEntered).length,...taskState});
 }
 async function adminRosterGet(context){ const auth=await authAdmin(context); if(!auth) return json({error:'未登录。'},401); return json(await getRoster(auth.store,context)); }
 async function adminRosterSave(context){
@@ -335,7 +337,7 @@ async function adminStudent(context){
   if(!studentKey) return json({error:'学生参数无效。'},400);
   const {rows}=await combinedStudents(auth.store,context), row=rows.find(s=>s.studentKey===studentKey); if(!row) return json({error:'没有该学生。'},404);
   const taskState=await getTaskState(auth.store,context), selectedTask=taskById(requestedTask)||taskState.activeTask;
-  const sourceKeys=row.isTest ? (Array.isArray(row.aliasStudentKeys)&&row.aliasStudentKeys.length?row.aliasStudentKeys:[studentKey]) : [studentKey];
+  const sourceKeys=Array.isArray(row.aliasStudentKeys)&&row.aliasStudentKeys.length?row.aliasStudentKeys:[studentKey];
   const messages=[];
   for(const sourceStudentKey of sourceKeys){
     const part=(await listMessages(auth.store,context,sourceStudentKey,selectedTask.id)).filter(m=>m.role!=='system_error');
@@ -364,8 +366,17 @@ async function adminExport(context){
   const {rows}=await combinedStudents(auth.store,context), out=[];
   for(const p of rows){
     if(p.isTest&&!includeTest) continue;
+    const sourceKeys=Array.isArray(p.aliasStudentKeys)&&p.aliasStudentKeys.length?p.aliasStudentKeys:[p.studentKey];
     const taskData=[];
-    for(const t of TASKS){ taskData.push({task:t,messages:(await listMessages(auth.store,context,p.studentKey,t.id)).filter(m=>m.role!=='system_error')}); }
+    for(const t of TASKS){
+      const messages=[];
+      for(const sourceStudentKey of sourceKeys){
+        const part=(await listMessages(auth.store,context,sourceStudentKey,t.id)).filter(m=>m.role!=='system_error');
+        for(const m of part) messages.push({...m,sourceStudentKey});
+      }
+      messages.sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||String(a.messageId).localeCompare(String(b.messageId)));
+      taskData.push({task:t,messages});
+    }
     out.push({profile:p,tasks:taskData});
   }
   if(format==='csv'){
