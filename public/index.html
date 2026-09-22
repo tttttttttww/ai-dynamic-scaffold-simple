@@ -88,6 +88,13 @@
         <button id="switchBtn" class="secondary">更换学生</button>
       </div>
       <div id="messages" class="messages"></div>
+      <div id="processingOverlay" class="processing-overlay hidden" aria-live="polite" aria-busy="true">
+        <div class="processing-card">
+          <div class="processing-spinner" aria-hidden="true"></div>
+          <div class="processing-title">AI 正在思考，请稍候…</div>
+          <div class="processing-subtitle">回复完成前，暂时不能继续发送图片或文字。</div>
+        </div>
+      </div>
       <div class="composer unified-composer">
         <div id="previewRow" class="preview-row compact-preview hidden">
           <img id="previewImage" alt="待上传图片预览" />
