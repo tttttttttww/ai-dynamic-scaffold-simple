@@ -174,6 +174,17 @@ async function waitForCoze(token,conversationId,chatId){
   }
   throw new Error('AI 回复超时，请稍后重试。');
 }
+async function getCozeStatus(token,conversationId,chatId){
+  const res=await fetch(`https://api.coze.cn/v3/chat/retrieve?conversation_id=${encodeURIComponent(conversationId)}&chat_id=${encodeURIComponent(chatId)}`,{headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok||data.code!==0) throw new Error(data.msg||`查询扣子对话状态失败（HTTP ${res.status}）`);
+  const status=String(data.data?.status||'');
+  if(status==='failed') throw new Error(data.data?.last_error?.msg||'扣子智能体执行失败');
+  if(status==='requires_action') throw new Error('智能体当前需要额外工具操作。');
+  if(status==='canceled') throw new Error('扣子对话已取消');
+  return status || 'in_progress';
+}
+
 async function getCozeAnswer(token,conversationId,chatId){
   const res=await fetch(`https://api.coze.cn/v3/chat/message/list?conversation_id=${encodeURIComponent(conversationId)}&chat_id=${encodeURIComponent(chatId)}`,{headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}});
   const data=await res.json().catch(()=>({}));
@@ -209,16 +220,46 @@ async function chat(context){
     const createdAt=new Date().toISOString(), conversationId=requestedConversationId||profile.conversationId||'';
     const chatStart=await startCozeChat({token,botId,userId:`u_${studentKey}`,message,fileId:cozeFileId,conversationId,meta:{student_key:studentKey,class_name:className,student_id:studentId}});
     await saveMessage(store,context,studentKey,{messageId:randomUUID(),studentKey,className,studentId,studentName,role:'user',text:message||'（上传了一张图片）',imageId:imageId||null,createdAt,conversationId:chatStart.conversationId,chatId:chatStart.chatId});
-    await waitForCoze(token,chatStart.conversationId,chatStart.chatId);
-    const answer=await getCozeAnswer(token,chatStart.conversationId,chatStart.chatId), answerAt=new Date().toISOString();
-    await saveMessage(store,context,studentKey,{messageId:randomUUID(),studentKey,className,studentId,studentName,role:'assistant',text:answer,imageId:null,createdAt:answerAt,conversationId:chatStart.conversationId,chatId:chatStart.chatId});
     const current=await getProfile(store,context,studentKey)||profile;
-    Object.assign(current,{className,studentId,studentName,conversationId:chatStart.conversationId,updatedAt:answerAt,messageCount:Number(current.messageCount||0)+2});
+    Object.assign(current,{className,studentId,studentName,conversationId:chatStart.conversationId,updatedAt:createdAt,messageCount:Number(current.messageCount||0)+1});
     await saveProfile(store,context,current);
-    return json({answer,conversationId:chatStart.conversationId,chatId:chatStart.chatId,createdAt:answerAt});
+    // 不在本次服务器请求里等待 AI 完成，避免 EdgeOne 单次请求超时。
+    return json({status:'pending',conversationId:chatStart.conversationId,chatId:chatStart.chatId,createdAt});
   }catch(e){
     await saveMessage(store,context,studentKey,{messageId:randomUUID(),studentKey,className,studentId,studentName,role:'system_error',text:String(e?.message||e),imageId:imageId||null,createdAt:new Date().toISOString(),conversationId:requestedConversationId||profile.conversationId||'',chatId:''}).catch(()=>{});
     return json({error:String(e?.message||'AI 请求失败')},502);
+  }
+}
+
+async function chatStatus(context){
+  const token=envOf(context,'COZE_ACCESS_TOKEN');
+  if(!token) return json({error:'服务器尚未配置 COZE_ACCESS_TOKEN。'},500);
+  const store=storeOf(context), url=new URL(context.request.url);
+  const studentKey=safeId(url.searchParams.get('studentKey')||''), className=normalizeClass(url.searchParams.get('className')), studentId=normalizeStudentId(url.searchParams.get('studentId')), studentName=normalizeName(url.searchParams.get('studentName'));
+  const conversationId=String(url.searchParams.get('conversationId')||'').trim(), chatId=String(url.searchParams.get('chatId')||'').trim();
+  if(!studentKey||!className||!studentId||!studentName||!conversationId||!chatId) return json({error:'查询参数不完整。'},400);
+  const entry=await findRosterEntry(store,context,{studentKey,className,studentId,studentName});
+  if(!entry || entry.studentKey!==studentKey) return json({error:'当前学生信息无效，请重新进入。'},403);
+  const profile=await getProfile(store,context,studentKey);
+  if(!profile) return json({error:'学生会话不存在，请重新进入。'},403);
+
+  try{
+    const status=await getCozeStatus(token,conversationId,chatId);
+    if(status!=='completed') return json({status});
+
+    const messages=await listMessages(store,context,studentKey);
+    const existing=messages.find(m=>m.role==='assistant' && String(m.chatId||'')===chatId);
+    if(existing) return json({status:'completed',answer:existing.text,conversationId,chatId,createdAt:existing.createdAt});
+
+    const answer=await getCozeAnswer(token,conversationId,chatId), answerAt=new Date().toISOString();
+    await saveMessage(store,context,studentKey,{messageId:randomUUID(),studentKey,className,studentId,studentName,role:'assistant',text:answer,imageId:null,createdAt:answerAt,conversationId,chatId});
+    const current=await getProfile(store,context,studentKey)||profile;
+    Object.assign(current,{className,studentId,studentName,conversationId,updatedAt:answerAt,messageCount:Number(current.messageCount||0)+1});
+    await saveProfile(store,context,current);
+    return json({status:'completed',answer,conversationId,chatId,createdAt:answerAt});
+  }catch(e){
+    await saveMessage(store,context,studentKey,{messageId:randomUUID(),studentKey,className,studentId,studentName,role:'system_error',text:String(e?.message||e),imageId:null,createdAt:new Date().toISOString(),conversationId,chatId}).catch(()=>{});
+    return json({status:'failed',error:String(e?.message||'AI 请求失败')},502);
   }
 }
 
@@ -330,6 +371,7 @@ export default async function onRequest(context){
     if(path==='roster/classes'&&context.request.method==='GET') return await publicClasses(context);
     if(path==='student/start'&&context.request.method==='POST') return await startStudent(context);
     if(path==='chat'&&context.request.method==='POST') return await chat(context);
+    if(path==='chat/status'&&context.request.method==='GET') return await chatStatus(context);
     if(path==='admin/login'&&context.request.method==='POST') return await adminLogin(context);
     if(path==='admin/logout'&&context.request.method==='POST') return await adminLogout(context);
     if(path==='admin/students'&&context.request.method==='GET') return await adminStudents(context);
