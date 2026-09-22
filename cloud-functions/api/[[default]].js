@@ -153,6 +153,21 @@ async function startStudent(context){
   return json({studentKey:entry.studentKey,studentName:entry.studentName,isTest:!!entry.isTest,testCode:entry.testCode||'',taskId:task.id,taskLabel:task.label,conversationId:session.conversationId||'',requiresInitialImage:!hasInitialImage,messages:messages.slice(-200),profileUpdatedAt:profile.updatedAt});
 }
 
+async function studentImage(context){
+  const store=storeOf(context), url=new URL(context.request.url);
+  const studentKey=safeId(url.searchParams.get('studentKey')||''), studentName=normalizeName(url.searchParams.get('studentName')), taskId=safeId(url.searchParams.get('taskId')||''), imageId=safeId(url.searchParams.get('imageId')||'');
+  if(!studentKey||!studentName||!taskById(taskId)||!imageId) return json({error:'图片参数无效。'},400);
+  const entry=await findStudent(store,context,{studentKey,studentName});
+  if(!entry||entry.studentKey!==studentKey) return json({error:'学生身份无效，请重新进入。'},403);
+  // Only serve an image that is actually referenced by this student's message history for this task.
+  const messages=await listMessages(store,context,studentKey,taskId);
+  if(!messages.some(m=>m.role==='user'&&String(m.imageId||'')===imageId)) return json({error:'图片不存在。'},404);
+  const prefix=`${taskBase(context,studentKey,taskId)}/images/${imageId}`;
+  const meta=await getJson(store,`${prefix}.json`), buf=await store.get(`${prefix}.bin`,{type:'arrayBuffer',consistency:'strong'});
+  if(!meta||!buf) return json({error:'图片不存在。'},404);
+  return new Response(buf,{headers:{'Content-Type':meta.contentType||'application/octet-stream','Cache-Control':'private, max-age=300'}});
+}
+
 async function uploadToCoze(token,image,filename){
   const buf=await image.arrayBuffer(), form=new FormData(), type=image.type||'application/octet-stream';
   form.append('file',new Blob([buf],{type}),filename||'image.png');
@@ -415,6 +430,7 @@ export default async function onRequest(context){
   try{
     if(path==='task/current'&&context.request.method==='GET') return await publicTaskState(context);
     if(path==='student/start'&&context.request.method==='POST') return await startStudent(context);
+    if(path==='student/image'&&context.request.method==='GET') return await studentImage(context);
     if(path==='chat'&&context.request.method==='POST') return await chat(context);
     if(path==='chat/status'&&context.request.method==='GET') return await chatStatus(context);
     if(path==='admin/login'&&context.request.method==='POST') return await adminLogin(context);

@@ -788,3 +788,6 @@ textarea:disabled,
 .pending-spinner { width:15px; height:15px; border-radius:50%; border:2px solid #ded5aa; border-top-color:#a8923e; animation:spin 1s linear infinite; }
 @keyframes pulseDot { 0%,100%{opacity:.45;transform:scale(.9)} 50%{opacity:1;transform:scale(1.08)} }
 @media(max-width:980px){.live-toolbar{grid-template-columns:1fr}.live-summary{flex-wrap:wrap}.toolbar{justify-content:flex-start}}
+
+/* v17 restore historical images for students */
+.msg-image { cursor: zoom-in; }
