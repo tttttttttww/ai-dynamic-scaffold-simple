@@ -139,7 +139,7 @@ function showChat(history=[]) {
     const empty=document.createElement('div');
     empty.id='chatEmpty';
     empty.className='chat-empty';
-    empty.innerHTML='<div class="chat-empty-icon">▧</div><strong>先上传你的作品图片</strong><span>选择图片后点击“发送给 AI”，AI 会根据图片开始和你对话。</span>';
+    empty.innerHTML='<div class="chat-empty-icon">▧</div><strong>先上传你的作品图片</strong><span>选择图片后点击“发送给 AI”，AI 会根据图片开始和你对话，之后你也可以继续上传新图片或输入文字。</span>';
     $('messages').appendChild(empty);
   } else history.forEach(m => renderMessage({role:m.role, text:m.text, createdAt:m.createdAt}));
 }
