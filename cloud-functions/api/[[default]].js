@@ -15,6 +15,24 @@ function safeId(v='') { return String(v).replace(/[^A-Za-z0-9_-]/g,''); }
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 function studentKeyOf(className, studentId) { return createHash('sha256').update(`${normalizeClass(className)}\0${normalizeStudentId(studentId)}`).digest('hex').slice(0,24); }
 
+const TEST_ACCOUNT = Object.freeze({
+  className:'测试',
+  studentId:'S00',
+  studentName:'测试',
+});
+function testAccount() {
+  return {
+    ...TEST_ACCOUNT,
+    studentKey: studentKeyOf(TEST_ACCOUNT.className, TEST_ACCOUNT.studentId),
+    isTest: true
+  };
+}
+function isTestIdentity(className, studentId, studentName='') {
+  return normalizeClass(className) === TEST_ACCOUNT.className
+    && normalizeStudentId(studentId).toUpperCase() === TEST_ACCOUNT.studentId
+    && (!studentName || normalizeName(studentName) === TEST_ACCOUNT.studentName);
+}
+
 async function getJson(store,key) { return await store.get(key,{type:'json',consistency:'strong'}); }
 async function putJson(store,key,data) { await store.setJSON(key,data); }
 function rosterKey(context) { return `${basePrefix(context)}/roster.json`; }
@@ -36,6 +54,7 @@ function normalizeRosterRows(rows=[]) {
     const studentId=normalizeStudentId(raw.studentId);
     const studentName=normalizeName(raw.studentName);
     if (!className || !studentId || !studentName) continue;
+    if (isTestIdentity(className,studentId)) throw new Error('“测试 / S00 / 测试”是系统内置测试账号，不需要放进正式名单。');
     const studentKey=studentKeyOf(className,studentId);
     if (seen.has(studentKey)) throw new Error(`名单中存在重复编号：${className} / ${studentId}`);
     seen.add(studentKey);
@@ -46,6 +65,14 @@ function normalizeRosterRows(rows=[]) {
   return out;
 }
 async function findRosterEntry(store, context, {studentKey='', className='', studentId='', studentName=''}) {
+  const test=testAccount();
+  if (
+    (studentKey && studentKey===test.studentKey)
+    || isTestIdentity(className,studentId,studentName)
+  ) {
+    if (studentName && normalizeName(studentName)!==test.studentName) return null;
+    return test;
+  }
   const roster=await getRoster(store,context);
   let entry=null;
   if (studentKey) entry=roster.students.find(s=>s.studentKey===studentKey) || null;
@@ -75,8 +102,9 @@ async function saveProfile(store, context, profile) { await putJson(store,`${bas
 
 async function publicClasses(context) {
   const store=storeOf(context); const roster=await getRoster(store,context);
-  const classes=[...new Set(roster.students.map(s=>s.className).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
-  return json({classes, rosterCount:roster.students.length});
+  const formal=[...new Set(roster.students.map(s=>s.className).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
+  const classes=[TEST_ACCOUNT.className, ...formal.filter(c=>c!==TEST_ACCOUNT.className)];
+  return json({classes, rosterCount:roster.students.length, testAccount:{className:TEST_ACCOUNT.className,studentId:TEST_ACCOUNT.studentId,studentName:TEST_ACCOUNT.studentName}});
 }
 
 async function startStudent(context) {
@@ -87,21 +115,26 @@ async function startStudent(context) {
   if (!studentId) return json({error:'请输入学生编号。'},400);
   if (!studentName) return json({error:'请输入姓名。'},400);
   const roster=await getRoster(store,context);
-  if (!roster.students.length) return json({error:'教师尚未上传学生名单，请联系老师。'},503);
-  const entry=roster.students.find(s=>s.className===className && s.studentId===studentId);
-  if (!entry || entry.studentName!==studentName) return json({error:'班级、编号或姓名不匹配，请检查后重新输入。'},403);
+  let entry=null;
+  if (isTestIdentity(className,studentId,studentName)) {
+    entry=testAccount();
+  } else {
+    if (!roster.students.length) return json({error:'教师尚未上传学生名单，请联系老师。'},503);
+    entry=roster.students.find(s=>s.className===className && s.studentId===studentId);
+    if (!entry || entry.studentName!==studentName) return json({error:'班级、编号或姓名不匹配，请检查后重新输入。'},403);
+  }
 
   const now=new Date().toISOString();
   let profile=await getProfile(store,context,entry.studentKey);
   if(!profile){
-    profile={studentKey:entry.studentKey,className:entry.className,studentId:entry.studentId,studentName:entry.studentName,createdAt:now,updatedAt:now,messageCount:0,conversationId:''};
+    profile={studentKey:entry.studentKey,className:entry.className,studentId:entry.studentId,studentName:entry.studentName,isTest:!!entry.isTest,createdAt:now,updatedAt:now,messageCount:0,conversationId:''};
     await saveProfile(store,context,profile);
   } else {
-    profile.className=entry.className; profile.studentId=entry.studentId; profile.studentName=entry.studentName;
+    profile.className=entry.className; profile.studentId=entry.studentId; profile.studentName=entry.studentName; profile.isTest=!!entry.isTest;
     await saveProfile(store,context,profile);
   }
   const messages=(await listMessages(store,context,entry.studentKey)).filter(m=>m.role==='user'||m.role==='assistant');
-  return json({studentKey:entry.studentKey,className:entry.className,studentId:entry.studentId,studentName:entry.studentName,conversationId:profile.conversationId||'',messages:messages.slice(-100)});
+  return json({studentKey:entry.studentKey,className:entry.className,studentId:entry.studentId,studentName:entry.studentName,isTest:!!entry.isTest,conversationId:profile.conversationId||'',messages:messages.slice(-100)});
 }
 
 async function uploadToCoze(token,image,filename){
@@ -210,17 +243,26 @@ async function combinedStudents(store,context){
   const roster=await getRoster(store,context), profiles=await listProfiles(store,context), pmap=new Map(profiles.map(p=>[p.studentKey,p]));
   const rows=roster.students.map(r=>{
     const p=pmap.get(r.studentKey); pmap.delete(r.studentKey);
-    return {...r,createdAt:p?.createdAt||null,updatedAt:p?.updatedAt||null,messageCount:Number(p?.messageCount||0),conversationId:p?.conversationId||'',hasEntered:!!p,inRoster:true};
+    return {...r,isTest:false,createdAt:p?.createdAt||null,updatedAt:p?.updatedAt||null,messageCount:Number(p?.messageCount||0),conversationId:p?.conversationId||'',hasEntered:!!p,inRoster:true};
   });
-  for(const p of pmap.values()) rows.push({...p,className:p.className||'历史数据',studentId:p.studentId||p.studentKey,studentName:p.studentName||'—',hasEntered:true,inRoster:false});
-  rows.sort((a,b)=>String(a.className).localeCompare(String(b.className),'zh-CN')||String(a.studentId).localeCompare(String(b.studentId),'zh-CN',{numeric:true}));
+
+  const test=testAccount(), tp=pmap.get(test.studentKey);
+  if (tp) pmap.delete(test.studentKey);
+  rows.unshift({...test,createdAt:tp?.createdAt||null,updatedAt:tp?.updatedAt||null,messageCount:Number(tp?.messageCount||0),conversationId:tp?.conversationId||'',hasEntered:!!tp,inRoster:false});
+
+  for(const p of pmap.values()) rows.push({...p,className:p.className||'历史数据',studentId:p.studentId||p.studentKey,studentName:p.studentName||'—',hasEntered:true,inRoster:false,isTest:!!p.isTest});
+  rows.sort((a,b)=>{
+    if (!!a.isTest !== !!b.isTest) return a.isTest ? -1 : 1;
+    return String(a.className).localeCompare(String(b.className),'zh-CN')||String(a.studentId).localeCompare(String(b.studentId),'zh-CN',{numeric:true});
+  });
   return {rows,roster};
 }
 async function adminStudents(context){
   const auth=await authAdmin(context); if(!auth) return json({error:'未登录。'},401);
   const {rows,roster}=await combinedStudents(auth.store,context);
-  const classes=[...new Set(roster.students.map(s=>s.className))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
-  return json({students:rows,classes,rosterCount:roster.students.length,enteredCount:rows.filter(s=>s.inRoster&&s.hasEntered).length,rosterUpdatedAt:roster.updatedAt});
+  const formal=[...new Set(roster.students.map(s=>s.className))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
+  const classes=[TEST_ACCOUNT.className,...formal.filter(c=>c!==TEST_ACCOUNT.className)];
+  return json({students:rows,classes,rosterCount:roster.students.length,classCount:formal.length,enteredCount:rows.filter(s=>!s.isTest&&s.inRoster&&s.hasEntered).length,rosterUpdatedAt:roster.updatedAt});
 }
 async function adminRosterGet(context){
   const auth=await authAdmin(context); if(!auth) return json({error:'未登录。'},401);
@@ -240,7 +282,15 @@ async function adminStudent(context){
   const url=new URL(context.request.url), studentKey=safeId(url.searchParams.get('studentKey')||'');
   if(!studentKey) return json({error:'学生参数无效。'},400);
   let profile=await getProfile(auth.store,context,studentKey);
-  if(!profile){ const roster=await getRoster(auth.store,context), entry=roster.students.find(s=>s.studentKey===studentKey); if(!entry) return json({error:'没有该学生数据。'},404); profile={...entry,createdAt:null,updatedAt:null,messageCount:0,conversationId:'',hasEntered:false}; }
+  if(!profile){
+    const test=testAccount();
+    if(studentKey===test.studentKey) profile={...test,createdAt:null,updatedAt:null,messageCount:0,conversationId:'',hasEntered:false};
+    else {
+      const roster=await getRoster(auth.store,context), entry=roster.students.find(s=>s.studentKey===studentKey);
+      if(!entry) return json({error:'没有该学生数据。'},404);
+      profile={...entry,isTest:false,createdAt:null,updatedAt:null,messageCount:0,conversationId:'',hasEntered:false};
+    }
+  }
   const messages=(await listMessages(auth.store,context,studentKey)).filter(m=>m.role!=='system_error');
   return json({profile,messages});
 }
@@ -255,9 +305,12 @@ async function adminImage(context){
 function csvCell(v){ const s=String(v??''); return /[",\n\r]/.test(s)?`"${s.replaceAll('"','""')}"`:s; }
 async function adminExport(context){
   const auth=await authAdmin(context); if(!auth) return json({error:'未登录。'},401);
-  const url=new URL(context.request.url), format=(url.searchParams.get('format')||'json').toLowerCase();
+  const url=new URL(context.request.url), format=(url.searchParams.get('format')||'json').toLowerCase(), includeTest=url.searchParams.get('includeTest')==='1';
   const {rows}=await combinedStudents(auth.store,context), out=[];
-  for(const p of rows){ const messages=await listMessages(auth.store,context,p.studentKey); out.push({profile:p,messages}); }
+  for(const p of rows){
+    if(p.isTest && !includeTest) continue;
+    const messages=await listMessages(auth.store,context,p.studentKey); out.push({profile:p,messages});
+  }
   if(format==='csv'){
     const head=['class_name','student_id','student_name','in_roster','has_entered','message_id','role','text','has_image','image_id','created_at','conversation_id','chat_id'], lines=[head.join(',')];
     for(const row of out){ for(const m of row.messages){ if(m.role==='system_error') continue; lines.push([row.profile.className,row.profile.studentId,row.profile.studentName,row.profile.inRoster?1:0,row.profile.hasEntered?1:0,m.messageId,m.role,m.text,m.imageId?1:0,m.imageId||'',m.createdAt,m.conversationId||'',m.chatId||''].map(csvCell).join(',')); } }

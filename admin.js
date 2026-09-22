@@ -42,10 +42,14 @@ function renderStudents(){
     const div=document.createElement('div'); div.className='student-item'+(s.studentKey===selectedKey?' active':'');
     const title=document.createElement('div'); title.className='student-title';
     const name=document.createElement('span'); name.textContent=`${s.studentId} · ${s.studentName}`; title.appendChild(name);
-    const badge=document.createElement('span'); badge.className=`badge ${s.hasEntered?'entered':'waiting'}`; badge.textContent=s.hasEntered?'已进入':'未进入'; title.appendChild(badge);
+    const badge=document.createElement('span');
+    if(s.isTest){ badge.className='badge test'; badge.textContent='测试'; }
+    else { badge.className=`badge ${s.hasEntered?'entered':'waiting'}`; badge.textContent=s.hasEntered?'已进入':'未进入'; }
+    title.appendChild(badge);
     const sub=document.createElement('div'); sub.className='student-sub';
-    sub.textContent=s.hasEntered?`${s.className} · ${s.messageCount||0} 条消息 · 最近 ${fmtTime(s.updatedAt)}`:`${s.className} · 尚无学习记录`;
-    div.append(title,sub); div.addEventListener('click',()=>loadStudent(s.studentKey)); list.appendChild(div);
+    sub.textContent=s.hasEntered?`${s.className} · ${s.messageCount||0} 条消息 · 最近 ${fmtTime(s.updatedAt)}`:`${s.className} · ${s.isTest?'固定测试账号':'尚无学习记录'}`;
+    const view=document.createElement('div'); view.className='student-view-hint'; view.textContent=s.hasEntered?'点击查看对话 →':'点击查看状态 →';
+    div.append(title,sub,view); div.addEventListener('click',()=>loadStudent(s.studentKey)); list.appendChild(div);
   });
 }
 async function loadStudents(){
@@ -53,7 +57,7 @@ async function loadStudents(){
   students=data.students||[]; classes=data.classes||[];
   renderClassFilter(); renderStudents();
   const updated=data.rosterUpdatedAt?` · 最近上传 ${fmtTime(data.rosterUpdatedAt)}`:'';
-  $('rosterSummary').textContent=data.rosterCount?`${data.classCount||classes.length} 个班 · 名单 ${data.rosterCount} 人 · 已进入 ${data.enteredCount} 人${updated}`:'还没有上传学生名单，请先上传名单。';
+  $('rosterSummary').textContent=data.rosterCount?`${data.classCount||0} 个正式班 · 名单 ${data.rosterCount} 人 · 已进入 ${data.enteredCount} 人${updated}`:'还没有上传正式名单；固定测试账号 S00 可直接使用。';
 }
 async function fetchProtectedImage(url){ const res=await api(url); if(!res.ok)return null; const blob=await res.blob(); const obj=URL.createObjectURL(blob); imageUrls.add(obj); return obj; }
 async function loadStudent(studentKey){
@@ -61,12 +65,14 @@ async function loadStudent(studentKey){
   const res=await api(`/api/admin/student?studentKey=${encodeURIComponent(studentKey)}`); const data=await res.json(); if(!res.ok)throw new Error(data.error||'加载学生记录失败');
   const p=data.profile; $('detailTitle').textContent=`${p.className} · ${p.studentId} · ${p.studentName}`;
   $('detailSub').textContent=p.createdAt?`首次进入 ${fmtTime(p.createdAt)} · 最近活动 ${fmtTime(p.updatedAt)}`:'该学生尚未进入平台。';
+  const count=data.messages?.length||0; $('messageCountPill').textContent=`${count} 条消息`; $('messageCountPill').classList.remove('hidden');
   const box=$('adminMessages'); box.innerHTML='';
-  if(!data.messages?.length){box.innerHTML='<div class="empty">暂无聊天记录。</div>';return;}
+  if(!data.messages?.length){box.innerHTML='<div class="empty empty-chat"><strong>暂无对话记录</strong><span>该学生还没有与 AI 产生聊天记录。</span></div>';return;}
   for(const m of data.messages){
+    const row=document.createElement('div'); row.className=`admin-chat-row ${m.role==='user'?'student':'ai'}`;
     const item=document.createElement('div'); item.className='admin-msg';
     const meta=document.createElement('div'); meta.className='meta';
-    const role=document.createElement('span'); role.textContent=m.role==='user'?'学生':'AI';
+    const role=document.createElement('span'); role.className='role-label'; role.textContent=m.role==='user'?'学生':'AI';
     const time=document.createElement('span'); time.textContent=fmtTime(m.createdAt); meta.append(role,time);
     const content=document.createElement('div'); content.className='content'; content.textContent=m.text||''; item.append(meta,content);
     if(m.imageId){
@@ -75,8 +81,9 @@ async function loadStudent(studentKey){
         if(!src){loading.textContent='图片加载失败';return;} const img=document.createElement('img'); img.src=src; img.alt='学生上传图片'; loading.replaceWith(img);
       });
     }
-    box.appendChild(item);
+    row.appendChild(item); box.appendChild(row);
   }
+  box.scrollTop=box.scrollHeight;
 }
 
 function openRosterModal(){ pendingRoster=[]; rosterErr(''); $('rosterFile').value=''; $('rosterFileName').textContent='点击选择 Excel 或 CSV'; $('rosterPreview').classList.add('hidden'); $('confirmRosterBtn').disabled=true; $('rosterModal').classList.remove('hidden'); document.body.classList.add('modal-open'); }

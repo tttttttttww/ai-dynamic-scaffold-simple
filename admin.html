@@ -31,8 +31,8 @@
           <button id="uploadRosterBtn" class="primary compact-btn">上传学生名单</button>
           <button id="downloadTemplateBtn" class="secondary compact-btn">下载名单模板</button>
           <button id="refreshBtn" class="secondary compact-btn">刷新</button>
-          <button id="exportCsvBtn" class="secondary compact-btn">导出 CSV</button>
-          <button id="exportJsonBtn" class="secondary compact-btn">导出 JSON</button>
+          <button id="exportCsvBtn" class="secondary compact-btn">导出正式 CSV</button>
+          <button id="exportJsonBtn" class="secondary compact-btn">导出正式 JSON</button>
           <button id="logoutBtn" class="secondary compact-btn">退出</button>
         </div>
       </div>
@@ -52,9 +52,9 @@
 
         <section class="card panel">
           <div class="panel-head">
-            <div><strong id="detailTitle">选择一名学生</strong><div id="detailSub" class="panel-sub"></div></div>
+            <div><div class="panel-kicker">对话记录</div><strong id="detailTitle">请选择一名学生</strong><div id="detailSub" class="panel-sub">点击左侧学生后，可直接查看其与 AI 的完整对话。</div></div><span id="messageCountPill" class="count-pill hidden"></span>
           </div>
-          <div id="adminMessages" class="admin-messages"><div class="empty">从左侧选择学生后查看完整记录。</div></div>
+          <div id="adminMessages" class="admin-messages"><div class="empty empty-chat"><strong>尚未选择学生</strong><span>点击左侧任意学生，即可在这里查看学生与 AI 的完整多轮对话和上传图片。</span></div></div>
         </section>
       </div>
     </section>

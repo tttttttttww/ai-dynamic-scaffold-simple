@@ -416,3 +416,18 @@ a { color: inherit; }
   .dashboard-toolbar > div:first-child { width:100%; }
   .toolbar { width:100%; }
 }
+
+/* v5: clearer in-browser conversation viewer */
+.panel-kicker{font-size:12px;font-weight:800;color:var(--primary);margin-bottom:5px;letter-spacing:.04em}
+.student-view-hint{margin-top:8px;font-size:12px;font-weight:700;color:var(--primary);opacity:.82}
+.student-item:hover .student-view-hint,.student-item.active .student-view-hint{opacity:1}
+.empty-chat{display:flex;min-height:260px;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.empty-chat strong{color:var(--text);font-size:16px}.empty-chat span{max-width:420px;line-height:1.7}
+.admin-chat-row{display:flex;width:100%;margin:14px 0}.admin-chat-row.student{justify-content:flex-end}.admin-chat-row.ai{justify-content:flex-start}
+.admin-chat-row .admin-msg{width:fit-content;max-width:min(78%,680px);margin:0}
+.admin-chat-row.student .admin-msg{background:linear-gradient(135deg,#5d79ff,#4b68ff);color:#fff;border-color:transparent}
+.admin-chat-row.student .admin-msg .meta{color:rgba(255,255,255,.78)}
+.admin-chat-row.ai .admin-msg{background:rgba(255,255,255,.98)}
+.role-label{font-weight:800}
+.admin-chat-row img{display:block;max-width:360px;max-height:320px;object-fit:contain;background:#fff}
+@media(max-width:780px){.admin-chat-row .admin-msg{max-width:92%}}
