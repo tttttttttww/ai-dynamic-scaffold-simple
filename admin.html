@@ -7,36 +7,58 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-grid"></div>
+
   <header class="topbar">
-    <div class="brand">教师后台</div>
+    <div class="brand-wrap">
+      <div class="brand-mark admin-mark">管</div>
+      <div>
+        <div class="brand">教师后台</div>
+        <div class="brand-sub">查看学生对话、上传图片与导出数据</div>
+      </div>
+    </div>
     <a class="link-btn" href="/">返回学生端</a>
   </header>
 
   <main class="page">
-    <section id="adminLogin" class="card login-card">
-      <h1>教师后台</h1>
-      <p class="muted">请输入后台密码。</p>
+    <section id="adminLogin" class="card login-card admin-login-card">
+      <div class="cover-hero compact-hero">
+        <div class="hero-badge">管理员验证</div>
+        <h1>进入教师后台</h1>
+        <p class="muted cover-desc">登录后可按学生查看完整聊天记录、上传图片与时间信息，并支持导出正式数据。</p>
+      </div>
       <div class="field">
         <label for="adminPassword">密码</label>
-        <input id="adminPassword" class="input" type="password" autocomplete="current-password" />
+        <input id="adminPassword" class="input" type="password" autocomplete="current-password" placeholder="请输入后台密码" />
       </div>
-      <button id="adminLoginBtn" class="primary full">登录</button>
+      <button id="adminLoginBtn" class="primary full large-btn">登录</button>
       <div id="adminError" class="error hidden"></div>
     </section>
 
     <section id="dashboard" class="hidden">
-      <div class="toolbar" style="margin-bottom:14px">
-        <button id="refreshBtn" class="secondary">刷新数据</button>
-        <button id="exportJsonBtn" class="secondary">导出正式 JSON</button>
-        <button id="exportCsvBtn" class="secondary">导出正式 CSV</button>
-        <button id="exportAllBtn" class="secondary">导出全部 JSON（含 S00）</button>
-        <button id="logoutBtn" class="secondary">退出</button>
+      <div class="card dashboard-toolbar">
+        <div class="toolbar-title">
+          <div class="mini-chip">数据管理</div>
+          <strong>教师操作区</strong>
+        </div>
+        <div class="toolbar">
+          <button id="refreshBtn" class="secondary">刷新数据</button>
+          <button id="exportJsonBtn" class="secondary">导出正式 JSON</button>
+          <button id="exportCsvBtn" class="secondary">导出正式 CSV</button>
+          <button id="exportAllBtn" class="secondary">导出全部 JSON（含 S00）</button>
+          <button id="logoutBtn" class="secondary">退出</button>
+        </div>
       </div>
       <div class="admin-layout">
         <section class="card panel">
           <div class="panel-head">
-            <strong>学生列表</strong>
-            <span id="studentCount" class="muted" style="font-size:13px"></span>
+            <div>
+              <strong>学生列表</strong>
+              <div class="panel-sub">按编号查看学生学习过程</div>
+            </div>
+            <span id="studentCount" class="muted count-pill"></span>
           </div>
           <div id="studentList" class="student-list"></div>
         </section>
@@ -44,7 +66,7 @@
           <div class="panel-head">
             <div>
               <strong id="detailTitle">选择一名学生</strong>
-              <div id="detailSub" class="muted" style="font-size:12px;margin-top:3px"></div>
+              <div id="detailSub" class="muted panel-sub"></div>
             </div>
           </div>
           <div id="adminMessages" class="admin-messages">

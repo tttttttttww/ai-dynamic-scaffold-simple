@@ -8,6 +8,6 @@
     "@edgeone/pages-blob": "latest"
   },
   "scripts": {
-    "build": "echo 'Static site + EdgeOne Makers Cloud Functions: no frontend build required'"
+    "build": "node build.mjs"
   }
 }

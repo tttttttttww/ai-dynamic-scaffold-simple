@@ -113,3 +113,16 @@ runs/{EXPERIMENT_RUN_ID}/admin-sessions/<token>.json
 ## 首页管理员入口
 
 首页封面提供“管理员进入”按钮，点击后输入密码，验证成功会直接进入后台。
+
+## EdgeOne Makers 构建设置（本版固定）
+
+本版会在 `npm run build` 时自动生成 `public/` 静态产物目录，并验证 `public/index.html` 存在。
+
+请使用：
+- 框架预设：Other
+- 根目录：./
+- 输出目录：public
+- 构建命令：npm run build
+- 安装命令：npm install
+
+如果构建日志中出现 `Entry verified: public/index.html`，说明首页已经进入静态构建产物。

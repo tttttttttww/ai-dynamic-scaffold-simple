@@ -3,36 +3,69 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI 学习助手</title>
+  <title>AI 学习支持平台</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-grid"></div>
+
   <header class="topbar">
-    <div class="brand">AI 学习助手</div>
+    <div class="brand-wrap">
+      <div class="brand-mark">AI</div>
+      <div>
+        <div class="brand">AI 学习支持平台</div>
+        <div class="brand-sub">图片上传 · 智能对话 · 教师可追踪</div>
+      </div>
+    </div>
   </header>
 
   <main class="page">
-    <section id="loginView" class="card login-card">
-      <h1>进入学习平台</h1>
-      <p class="muted">请输入自己的编号和姓名。正式学生使用 S01–S30。</p>
-      <div class="field">
-        <label for="studentId">学生编号</label>
-        <input id="studentId" class="input" maxlength="3" placeholder="例如 S01" autocomplete="off" />
+    <section id="loginView" class="card login-card enhanced-cover">
+      <div class="cover-hero">
+        <div class="hero-badge">课堂研究平台</div>
+        <h1>进入学习平台</h1>
+        <p class="muted cover-desc">学生可上传图片并向 AI 提问；教师可在后台查看过程数据与图片记录。</p>
+        <div class="hero-points">
+          <span>编号登录</span>
+          <span>支持图片</span>
+          <span>多轮对话</span>
+          <span>自动留痕</span>
+        </div>
       </div>
-      <div class="field">
-        <label for="studentName">姓名</label>
-        <input id="studentName" class="input" maxlength="20" placeholder="请输入姓名" autocomplete="off" />
+
+      <div class="field-group">
+        <div class="field">
+          <label for="studentId">学生编号</label>
+          <input id="studentId" class="input" maxlength="3" placeholder="例如 S01" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="studentName">姓名</label>
+          <input id="studentName" class="input" maxlength="20" placeholder="请输入姓名" autocomplete="off" />
+        </div>
       </div>
-      <button id="enterBtn" class="primary full">进入学习平台</button>
+
+      <div class="tips-box">
+        <div class="tips-title">使用说明</div>
+        <ul>
+          <li>正式学生使用 <strong>S01–S30</strong>；<strong>S00</strong> 为教师测试号。</li>
+          <li>进入后可以直接输入问题，也可以先上传一张图片再提问。</li>
+          <li>你的对话与上传图片会保存，便于教师后续查看学习过程。</li>
+        </ul>
+      </div>
+
+      <button id="enterBtn" class="primary full large-btn">进入学习平台</button>
       <div id="loginError" class="error hidden"></div>
 
-      <div class="entry-divider"><span>管理员入口</span></div>
+      <div class="entry-divider"><span>教师入口</span></div>
       <button id="adminEntryBtn" class="admin-entry full" type="button">管理员进入</button>
     </section>
 
     <section id="chatView" class="card chat-shell hidden">
       <div class="chat-head">
         <div>
+          <div class="mini-chip">学习对话区</div>
           <h2>与 AI 助手对话</h2>
           <div id="studentMeta" class="student-meta"></div>
         </div>
@@ -43,14 +76,14 @@
         <div id="previewRow" class="preview-row hidden">
           <img id="previewImage" alt="待上传图片预览" />
           <div>
-            <div id="previewName" style="font-size:14px;font-weight:600"></div>
-            <button id="removeImageBtn" class="secondary" style="margin-top:7px;padding:6px 9px;font-size:12px">移除图片</button>
+            <div id="previewName" class="preview-name"></div>
+            <button id="removeImageBtn" class="secondary small-btn">移除图片</button>
           </div>
         </div>
         <textarea id="messageInput" placeholder="输入你想问 AI 的内容……"></textarea>
         <div class="composer-actions">
           <label class="file-label">＋ 上传图片<input id="imageInput" type="file" accept="image/*" /></label>
-          <div style="display:flex;align-items:center;gap:10px">
+          <div class="action-group">
             <span id="sendStatus" class="status"></span>
             <button id="sendBtn" class="primary">发送</button>
           </div>
@@ -69,7 +102,7 @@
         <label for="coverAdminPassword">管理员密码</label>
         <input id="coverAdminPassword" class="input" type="password" autocomplete="current-password" placeholder="请输入密码" />
       </div>
-      <button id="coverAdminLoginBtn" class="primary full" type="button">进入后台</button>
+      <button id="coverAdminLoginBtn" class="primary full large-btn" type="button">进入后台</button>
       <div id="coverAdminError" class="error hidden"></div>
     </section>
   </div>
