@@ -1,9 +1,9 @@
 {
   "name": "ai-dynamic-scaffold-simple",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
-  "description": "Name-only student login + three-task Coze chat + teacher dashboard for EdgeOne Makers",
+  "description": "Inline clickable A/B/C responsive scaffold + image workflow + teacher dashboard for EdgeOne Makers",
   "dependencies": {
     "@edgeone/pages-blob": "latest"
   },

@@ -230,6 +230,7 @@ async function chat(context){
   const store=storeOf(context), form=await context.request.formData();
   const studentKey=safeId(form.get('studentKey')||''), studentName=normalizeName(form.get('studentName')), taskId=safeId(form.get('taskId')||'');
   const message=String(form.get('message')||'').trim().slice(0,8000), requestedConversationId=String(form.get('conversationId')||'').trim(), image=form.get('image');
+  const rawChoiceKey=String(form.get('choiceKey')||'').trim().toUpperCase(), choiceKey=['A','B','C'].includes(rawChoiceKey)?rawChoiceKey:'', choiceText=String(form.get('choiceText')||'').trim().slice(0,1000);
   if(!studentKey||!studentName||!taskById(taskId)) return json({error:'学生或任务信息无效，请重新进入。'},400);
   const entry=await findStudent(store,context,{studentKey,studentName}); if(!entry||entry.studentKey!==studentKey) return json({error:'学生身份无效，请重新进入。'},403);
   const current=await getTaskState(store,context);
@@ -239,7 +240,7 @@ async function chat(context){
   const existingMessages=await listMessages(store,context,studentKey,taskId);
   const hasInitialImage=existingMessages.some(m=>m.role==='user' && !!m.imageId);
   if(!hasInitialImage && !hasImage) return json({error:'本任务第一次提交请先上传作品图片。',requiresInitialImage:true},400);
-  if(!message&&!hasImage) return json({error:'请输入文字或上传图片。'},400);
+  if(!message&&!hasImage) return json({error:'请选择一个回答或上传作品图片。'},400);
   if(hasImage&&Number(image.size)>10*1024*1024) return json({error:'图片不能超过 10 MB。'},413);
   if(hasImage&&image.type&&!String(image.type).startsWith('image/')) return json({error:'仅支持图片文件。'},415);
 
@@ -252,7 +253,7 @@ async function chat(context){
     }
     const createdAt=new Date().toISOString(), conversationId=requestedConversationId||session.conversationId||'';
     const chatStart=await startCozeChat({token,botId,userId:`u_${studentKey}_${taskId}`,message,fileId:cozeFileId,conversationId,meta:{student_key:studentKey,student_name:entry.studentName,task_id:taskId,task_label:current.activeTask.label}});
-    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:current.activeTask.label,role:'user',text:message||'（上传了一张图片）',imageId:imageId||null,createdAt,conversationId:chatStart.conversationId,chatId:chatStart.chatId});
+    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:current.activeTask.label,role:'user',text:message||'（上传了一张图片）',interactionType:choiceKey?'choice':(imageId?'image':'text'),choiceKey:choiceKey||null,choiceText:choiceText||null,imageId:imageId||null,createdAt,conversationId:chatStart.conversationId,chatId:chatStart.chatId});
     await updateActivity(store,context,entry,taskId,chatStart.conversationId,createdAt,1,{status:'processing',pendingChatId:chatStart.chatId,lastUserAt:createdAt,chatStartedAt:createdAt,lastError:''});
     return json({status:'pending',taskId,taskLabel:current.activeTask.label,conversationId:chatStart.conversationId,chatId:chatStart.chatId,createdAt});
   }catch(e){
@@ -418,8 +419,8 @@ async function adminExport(context){
     out.push({profile:p,tasks:taskData});
   }
   if(format==='csv'){
-    const head=['student_name','is_test','task_id','task_label','message_id','role','text','has_image','image_id','created_at','conversation_id','chat_id'], lines=[head.join(',')];
-    for(const row of out){ for(const td of row.tasks){ for(const m of td.messages){ lines.push([row.profile.studentName,row.profile.isTest?1:0,td.task.id,td.task.label,m.messageId,m.role,m.text,m.imageId?1:0,m.imageId||'',m.createdAt,m.conversationId||'',m.chatId||''].map(csvCell).join(',')); } } }
+    const head=['student_name','is_test','task_id','task_label','message_id','role','text','interaction_type','choice_key','choice_text','has_image','image_id','created_at','conversation_id','chat_id'], lines=[head.join(',')];
+    for(const row of out){ for(const td of row.tasks){ for(const m of td.messages){ lines.push([row.profile.studentName,row.profile.isTest?1:0,td.task.id,td.task.label,m.messageId,m.role,m.text,m.interactionType||'',m.choiceKey||'',m.choiceText||'',m.imageId?1:0,m.imageId||'',m.createdAt,m.conversationId||'',m.chatId||''].map(csvCell).join(',')); } } }
     return new Response('\uFEFF'+lines.join('\r\n'),{headers:{'Content-Type':'text/csv; charset=UTF-8','Content-Disposition':'attachment; filename="ai-dynamic-scaffold.csv"','Cache-Control':'no-store'}});
   }
   return new Response(JSON.stringify({exportedAt:new Date().toISOString(),experimentRunId:runId(context),tasks:TASKS,students:out},null,2),{headers:{'Content-Type':'application/json; charset=UTF-8','Content-Disposition':'attachment; filename="ai-dynamic-scaffold.json"','Cache-Control':'no-store'}});

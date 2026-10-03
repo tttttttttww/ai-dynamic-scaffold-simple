@@ -92,31 +92,35 @@
         <div class="processing-card">
           <div class="processing-spinner" aria-hidden="true"></div>
           <div class="processing-title">AI 正在思考，请稍候…</div>
-          <div class="processing-subtitle">回复完成前，暂时不能继续发送图片或文字。</div>
+          <div class="processing-subtitle">回复完成前，暂时不能继续选择答案或发送图片。</div>
         </div>
       </div>
-      <div class="composer unified-composer">
-        <div id="previewRow" class="preview-row compact-preview hidden">
-          <img id="previewImage" alt="待上传图片预览" />
-          <div class="preview-copy">
-            <span class="preview-label">已选择图片</span>
-            <div id="previewName" class="preview-name"></div>
+      <div class="composer choice-composer">
+        <div class="image-compose-card">
+          <div class="image-compose-copy">
+            <strong id="imageActionTitle">上传作品图片</strong>
+            <span id="imageActionHint">新任务必须先上传作品；修改后也可以随时上传新图片。</span>
           </div>
-          <button id="removeImageBtn" class="preview-remove" type="button">移除</button>
+          <div id="previewRow" class="preview-row compact-preview hidden">
+            <img id="previewImage" alt="待上传图片预览" />
+            <div class="preview-copy">
+              <span class="preview-label">已选择图片</span>
+              <div id="previewName" class="preview-name"></div>
+            </div>
+            <button id="removeImageBtn" class="preview-remove" type="button">移除</button>
+          </div>
+          <div class="image-action-row">
+            <label class="attach-image-button" for="imageInput" title="选择作品图片">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="9" r="1.5" stroke="currentColor" stroke-width="1.5"/><path d="m5.7 17 4-4 3 2.8 2.2-2 3.4 3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span id="imagePickerLabel">选择图片</span>
+              <input id="imageInput" type="file" accept="image/*" />
+            </label>
+            <button id="sendImageBtn" class="primary send-image-button" type="button" disabled>发送作品图片</button>
+          </div>
         </div>
-
-        <div class="chat-input-row">
-          <label class="attach-image-button" for="imageInput" title="上传图片">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="9" r="1.5" stroke="currentColor" stroke-width="1.5"/><path d="m5.7 17 4-4 3 2.8 2.2-2 3.4 3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>图片</span>
-            <input id="imageInput" type="file" accept="image/*" />
-          </label>
-          <textarea id="messageInput" placeholder="输入内容；也可以只上传图片直接发送"></textarea>
-          <button id="sendBtn" class="primary send-button" type="button">发送</button>
-        </div>
-        <div class="composer-footer">
+        <div class="composer-footer choice-footer">
           <span id="sendStatus" class="status"></span>
-          <span class="enter-tip">新任务先发作品图 · 后续可继续发图或文字</span>
+          <span class="enter-tip">A / B / C 会直接显示在 AI 对话气泡里，点一下即可回答</span>
         </div>
       </div>
     </section>
