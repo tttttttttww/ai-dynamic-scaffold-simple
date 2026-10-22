@@ -214,6 +214,22 @@ async function getCozeAnswer(token,conversationId,chatId){
   return parts.join('\n').trim();
 }
 
+function isInvalidModelInputError(error){
+  const text=String(error?.message||error||'').toLowerCase();
+  return text.includes('input parameters')&&text.includes('invalid');
+}
+function studentFacingCozeError(error){
+  const text=String(error?.message||error||'');
+  const lower=text.toLowerCase();
+  if(lower.includes('insufficient coze credits')||lower.includes('credits balance')) return 'AI助手当前暂时无法使用，请联系老师稍后再试。';
+  return 'AI助手暂时没有成功回复，请稍后再试。';
+}
+async function cozeFileIdForImage(store,context,studentKey,taskId,imageId){
+  if(!imageId) return '';
+  const meta=await getJson(store,`${taskBase(context,studentKey,taskId)}/images/${imageId}.json`);
+  return String(meta?.cozeFileId||'');
+}
+
 async function updateActivity(store,context,entry,taskId,conversationId,at,delta=1,runtime={}){
   const profile=await ensureProfile(store,context,entry), stats=normalizeProfileTaskStats(profile);
   stats[taskId]={...stats[taskId],...runtime,messageCount:Number(stats[taskId]?.messageCount||0)+delta,updatedAt:at,conversationId:conversationId||stats[taskId]?.conversationId||''};
@@ -252,7 +268,15 @@ async function chat(context){
       await store.set(`${prefix}.bin`,up.arrayBuffer); await putJson(store,`${prefix}.json`,{imageId,fileName:image.name||'image.png',contentType:up.contentType,bytes:Number(image.size||0),cozeFileId,createdAt:new Date().toISOString()});
     }
     const createdAt=new Date().toISOString(), conversationId=requestedConversationId||session.conversationId||'';
-    const chatStart=await startCozeChat({token,botId,userId:`u_${studentKey}_${taskId}`,message,fileId:cozeFileId,conversationId,meta:{student_key:studentKey,student_name:entry.studentName,task_id:taskId,task_label:current.activeTask.label}});
+    const cozeArgs={token,botId,userId:`u_${studentKey}_${taskId}`,message,fileId:cozeFileId,meta:{student_key:studentKey,student_name:entry.studentName,task_id:taskId,task_label:current.activeTask.label}};
+    let chatStart;
+    try{
+      chatStart=await startCozeChat({...cozeArgs,conversationId});
+    }catch(firstError){
+      // If an old Coze conversation has become invalid, silently start a fresh one once.
+      if(conversationId&&isInvalidModelInputError(firstError)) chatStart=await startCozeChat({...cozeArgs,conversationId:''});
+      else throw firstError;
+    }
     await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:current.activeTask.label,role:'user',text:message||'（上传了一张图片）',interactionType:choiceKey?'choice':(imageId?'image':'text'),choiceKey:choiceKey||null,choiceText:choiceText||null,imageId:imageId||null,createdAt,conversationId:chatStart.conversationId,chatId:chatStart.chatId});
     await updateActivity(store,context,entry,taskId,chatStart.conversationId,createdAt,1,{status:'processing',pendingChatId:chatStart.chatId,lastUserAt:createdAt,chatStartedAt:createdAt,lastError:''});
     return json({status:'pending',taskId,taskLabel:current.activeTask.label,conversationId:chatStart.conversationId,chatId:chatStart.chatId,createdAt});
@@ -260,15 +284,15 @@ async function chat(context){
     const failedAt=new Date().toISOString(), errorText=String(e?.message||e);
     await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:errorText,imageId:imageId||null,createdAt:failedAt,conversationId:requestedConversationId||session.conversationId||'',chatId:''}).catch(()=>{});
     await updateActivity(store,context,entry,taskId,requestedConversationId||session.conversationId||'',failedAt,0,{status:'failed',pendingChatId:'',lastError:errorText}).catch(()=>{});
-    return json({error:errorText},502);
+    return json({error:studentFacingCozeError(e)},502);
   }
 }
 
 async function chatStatus(context){
-  const token=envOf(context,'COZE_ACCESS_TOKEN'); if(!token) return json({error:'服务器尚未配置 COZE_ACCESS_TOKEN。'},500);
+  const token=envOf(context,'COZE_ACCESS_TOKEN'), botId=envOf(context,'COZE_BOT_ID'); if(!token||!botId) return json({error:'服务器尚未配置 COZE_ACCESS_TOKEN / COZE_BOT_ID。'},500);
   const store=storeOf(context), url=new URL(context.request.url);
   const studentKey=safeId(url.searchParams.get('studentKey')||''), studentName=normalizeName(url.searchParams.get('studentName')), taskId=safeId(url.searchParams.get('taskId')||'');
-  const conversationId=String(url.searchParams.get('conversationId')||'').trim(), chatId=String(url.searchParams.get('chatId')||'').trim();
+  const conversationId=String(url.searchParams.get('conversationId')||'').trim(), chatId=String(url.searchParams.get('chatId')||'').trim(), retryAttempt=Math.max(0,Math.min(1,Number(url.searchParams.get('retryAttempt')||0)||0));
   if(!studentKey||!studentName||!taskById(taskId)||!conversationId||!chatId) return json({error:'查询参数不完整。'},400);
   const entry=await findStudent(store,context,{studentKey,studentName}); if(!entry||entry.studentKey!==studentKey) return json({error:'当前学生信息无效，请重新进入。'},403);
   try{
@@ -282,10 +306,30 @@ async function chatStatus(context){
     await updateActivity(store,context,entry,taskId,conversationId,answerAt,1,{status:'ready',pendingChatId:'',lastAssistantAt:answerAt,responseSeconds,lastError:''});
     return json({status:'completed',answer,taskId,conversationId,chatId,createdAt:answerAt,responseSeconds});
   }catch(e){
-    const failedAt=new Date().toISOString(), errorText=String(e?.message||e);
-    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:errorText,imageId:null,createdAt:failedAt,conversationId,chatId}).catch(()=>{});
-    await updateActivity(store,context,entry,taskId,conversationId,failedAt,0,{status:'failed',pendingChatId:'',lastError:errorText}).catch(()=>{});
-    return json({status:'failed',error:errorText},502);
+    const errorText=String(e?.message||e);
+    // Coze can occasionally leave a saved conversation in an invalid state. Re-create the
+    // conversation and replay the same student turn once, without asking the child to resend.
+    if(retryAttempt===0&&isInvalidModelInputError(e)){
+      try{
+        const messages=await listMessages(store,context,studentKey,taskId);
+        const original=messages.filter(m=>m.role==='user'&&String(m.chatId||'')===chatId).at(-1);
+        if(original){
+          const fileId=await cozeFileIdForImage(store,context,studentKey,taskId,original.imageId||'');
+          const originalMessage=(original.interactionType==='image'&&String(original.text||'').includes('上传了一张图片'))?'':String(original.text||'');
+          const retried=await startCozeChat({token,botId,userId:`u_${studentKey}_${taskId}`,message:originalMessage,fileId,conversationId:'',meta:{student_key:studentKey,student_name:entry.studentName,task_id:taskId,task_label:taskById(taskId)?.label||taskId}});
+          const retryAt=new Date().toISOString();
+          await updateActivity(store,context,entry,taskId,retried.conversationId,retryAt,0,{status:'processing',pendingChatId:retried.chatId,chatStartedAt:retryAt,lastError:''});
+          return json({status:'retrying',conversationId:retried.conversationId,chatId:retried.chatId,retryAttempt:1});
+        }
+      }catch(retryError){
+        // Fall through to the normal final-failure path below; keep the most useful error.
+        e=retryError;
+      }
+    }
+    const failedAt=new Date().toISOString(), finalErrorText=String(e?.message||e);
+    await saveMessage(store,context,studentKey,taskId,{messageId:randomUUID(),studentKey,studentName:entry.studentName,taskId,taskLabel:taskById(taskId)?.label||taskId,role:'system_error',text:finalErrorText,imageId:null,createdAt:failedAt,conversationId,chatId}).catch(()=>{});
+    await updateActivity(store,context,entry,taskId,conversationId,failedAt,0,{status:'failed',pendingChatId:'',lastError:finalErrorText}).catch(()=>{});
+    return json({status:'failed',error:studentFacingCozeError(e)},502);
   }
 }
 

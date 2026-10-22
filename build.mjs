@@ -1,6 +1,6 @@
 import { rm, mkdir, copyFile, access } from 'node:fs/promises';
 
-const files = ['index.html', 'admin.html', 'app.js', 'admin.js', 'styles.css'];
+const files = ['index.html', 'admin.html', 'app.js', 'admin.js', 'styles.css', 'admin-classic.css'];
 
 await rm('public', { recursive: true, force: true });
 await mkdir('public', { recursive: true });
