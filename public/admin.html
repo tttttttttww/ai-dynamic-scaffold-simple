@@ -49,7 +49,7 @@
       <div class="admin-layout">
         <section class="card panel">
           <div class="panel-head roster-head">
-            <div><strong>学生名单</strong><div class="panel-sub">点击学生即可查看任务1、任务2、任务3的独立对话。</div></div>
+            <div><strong>学生名单</strong><div class="panel-sub">点击学生即可查看任务1至任务6的独立对话。</div></div>
             <span id="studentCount" class="count-pill"></span>
           </div>
           <div id="studentList" class="student-list"></div>
@@ -65,7 +65,7 @@
             <span id="messageCountPill" class="count-pill hidden"></span>
           </div>
           <div id="studentTaskTabs" class="student-task-tabs hidden"></div>
-          <div id="adminMessages" class="admin-messages"><div class="empty empty-chat"><strong>尚未选择学生</strong><span>点击左侧学生后，可以分别查看三个任务中的完整对话和上传图片。</span></div></div>
+          <div id="adminMessages" class="admin-messages"><div class="empty empty-chat"><strong>尚未选择学生</strong><span>点击左侧学生后，可以分别查看六个任务中的完整对话和上传图片。</span></div></div>
         </section>
       </div>
     </section>
@@ -84,7 +84,7 @@
         <input id="rosterFile" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
       </label>
       <div id="rosterPreview" class="roster-preview hidden"></div>
-      <div class="roster-note">重新上传会替换当前可登录名单，但不会删除学生已经产生的三个任务对话。名单如有重名，需要先给重名学生添加可识别标记。</div>
+      <div class="roster-note">重新上传会替换当前可登录名单，但不会删除学生已经产生的六个任务对话。名单如有重名，需要先给重名学生添加可识别标记。</div>
       <button id="confirmRosterBtn" class="primary full enter-button" type="button" disabled>确认上传并替换名单</button>
       <div id="rosterError" class="error hidden"></div>
     </section>

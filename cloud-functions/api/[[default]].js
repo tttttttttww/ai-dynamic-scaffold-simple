@@ -6,6 +6,9 @@ const TASKS = Object.freeze([
   {id:'task1', label:'任务1'},
   {id:'task2', label:'任务2'},
   {id:'task3', label:'任务3'},
+  {id:'task4', label:'任务4'},
+  {id:'task5', label:'任务5'},
+  {id:'task6', label:'任务6'},
 ]);
 const TEST_ACCOUNT = Object.freeze({studentName:'测试', testCode:'S00', isTest:true});
 
