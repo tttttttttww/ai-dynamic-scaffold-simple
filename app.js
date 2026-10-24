@@ -1,10 +1,5 @@
 const $=id=>document.getElementById(id);
 const state={studentKey:'',studentName:'',taskId:'',taskLabel:'',conversationId:'',requiresInitialImage:false,selectedFile:null,sending:false,taskPoll:null,activeChoices:[]};
-const FALLBACK_CHOICES=[
-  {key:'A',text:'继续给我一点提示'},
-  {key:'B',text:'我还不太明白，请换一种简单说法'},
-  {key:'C',text:'我想先自己试一试'}
-];
 function fmtTime(iso){try{return new Date(iso).toLocaleString('zh-CN',{hour12:false});}catch{return'';}}
 function showError(text){$('loginError').textContent=text;$('loginError').classList.toggle('hidden',!text);}
 function showAdminError(text=''){$('coverAdminError').textContent=text;$('coverAdminError').classList.toggle('hidden',!text);}
@@ -16,7 +11,7 @@ function normalizeChoiceKey(key){return String(key||'').trim().toUpperCase().rep
 function normalizeOption(option,index){if(typeof option==='string')return {key:['A','B','C'][index]||'',text:option.trim()};if(option&&typeof option==='object')return {key:normalizeChoiceKey(option.key||option.id||option.label||['A','B','C'][index]),text:String(option.text||option.value||option.content||option.title||'').trim()};return null;}
 function parseChoiceResponse(raw=''){
   const original=String(raw||'').trim();
-  if(!original)return {displayText:'AI 已回复，请选择下面一个选项。',options:FALLBACK_CHOICES,fallback:true};
+  if(!original)return {displayText:'',options:[],fallback:false};
   const unwrapped=original.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
   try{
     const obj=JSON.parse(unwrapped);
@@ -38,7 +33,7 @@ function parseChoiceResponse(raw=''){
     if(!displayText)displayText='请选择下面一个选项。';
     return {displayText,options:['A','B','C'].map(k=>found.get(k)),fallback:false};
   }
-  return {displayText:original,options:FALLBACK_CHOICES,fallback:true};
+  return {displayText:original,options:[],fallback:false};
 }
 function studentImageUrl(imageId){if(!imageId||!state.studentKey||!state.studentName||!state.taskId)return '';const qs=new URLSearchParams({studentKey:state.studentKey,studentName:state.studentName,taskId:state.taskId,imageId});return `/api/student/image?${qs.toString()}`;}
 function deactivateInlineChoices(selectedKey=''){
@@ -60,7 +55,7 @@ function appendInlineChoices(bubble,options=[],fallback=false){
   state.activeChoices=Array.isArray(options)?options:[];
   if(!state.activeChoices.length)return;
   const group=document.createElement('div');group.className='inline-choice-list';group.dataset.current='true';
-  const hint=document.createElement('div');hint.className='inline-choice-hint';hint.textContent=fallback?'点一个选项继续':'直接点一个选项回答';group.appendChild(hint);
+  const hint=document.createElement('div');hint.className='inline-choice-hint';hint.textContent='直接点一个选项回答';group.appendChild(hint);
   for(const option of state.activeChoices){
     const btn=document.createElement('button');btn.type='button';btn.className='inline-choice-button';btn.dataset.choiceKey=option.key;btn.dataset.active='true';btn.disabled=state.sending||state.requiresInitialImage;
     const badge=document.createElement('span');badge.className='inline-choice-key';badge.textContent=option.key;
@@ -105,7 +100,7 @@ function applyStudentData(data,{notice=false}={}){const oldTask=state.taskId;sta
 async function enter(){showError('');const name=$('studentName').value.trim();if(!name)return showError('请输入姓名。');$('enterBtn').disabled=true;$('enterBtn').innerHTML='正在进入…';try{applyStudentData(await startStudent(name));startTaskWatcher();}catch(e){showError(e.message);}finally{$('enterBtn').disabled=false;$('enterBtn').innerHTML='进入学习平台 <span aria-hidden="true">→</span>';}}
 function showChat(history=[]){
   $('loginView').classList.add('hidden');$('chatView').classList.remove('hidden');setTaskUi();$('messages').innerHTML='';state.activeChoices=[];
-  if(!history.length){const empty=document.createElement('div');empty.id='chatEmpty';empty.className='chat-empty';empty.innerHTML=`<div class="chat-empty-icon">▧</div><strong>${state.taskLabel}：先上传作品图片</strong><span>每个新任务都从作品图片开始。AI 给出 A / B / C 后，直接在对话里点选，不需要打字。</span>`;$('messages').appendChild(empty);return;}
+  if(!history.length){const empty=document.createElement('div');empty.id='chatEmpty';empty.className='chat-empty';empty.innerHTML=`<div class="chat-empty-icon">▧</div><strong>${state.taskLabel}：先上传作品图片</strong><span>每个新任务都从作品图片开始。AI 给出选项时直接点选；没有选项时，按 AI 提示修改作品并上传新图片，不需要打字。</span>`;$('messages').appendChild(empty);return;}
   const lastIndex=history.length-1;
   history.forEach((m,i)=>{const isActiveAssistant=!state.requiresInitialImage&&i===lastIndex&&m.role==='assistant';const parsed=renderMessage({role:m.role,text:m.text,createdAt:m.createdAt,localImageUrl:m.imageId?studentImageUrl(m.imageId):''},{parseAssistant:isActiveAssistant});if(parsed)state.activeChoices=parsed.options;});
 }
